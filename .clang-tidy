@@ -1,0 +1,10 @@
+---
+Checks: 'bugprone-*,
+         modernize-*,
+         performance-*,
+         readability-*,
+         cppcoreguidelines-*'
+
+# This makes the build FAIL if Clang-Tidy finds an issue
+WarningsAsErrors: '*'
+---
