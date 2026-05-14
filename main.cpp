@@ -1,4 +1,5 @@
-int main(int argc, char **argv)
-{
-  return 0;
+#include <domain/market.hpp>
+
+auto main() -> int {
+    return 0;
 }

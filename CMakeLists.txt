@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON) # Treat all warnings as errors
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # --- Compiler Warnings ---
 add_library(project_warnings INTERFACE)
@@ -31,9 +32,9 @@ endif()
 
 # --- Subdirectories (Logic Folders) ---
 # Add your folders here as you create them
-# add_subdirectory(engine)
-# add_subdirectory(physics)
+add_subdirectory(src)
 
 # --- Main Executable ---
 add_executable(app main.cpp)
 target_link_libraries(app PRIVATE project_warnings)
+target_link_libraries(app PRIVATE src)
