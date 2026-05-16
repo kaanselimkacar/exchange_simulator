@@ -10,6 +10,12 @@
         clang-tools
         cmake
       ];
+
+      shellHook = ''
+        if [ -f .env.local ]; then
+          source .env.local
+        fi
+      '';
     };
   };
 }
