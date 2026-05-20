@@ -1,3 +1,4 @@
+#pragma once
 #include "domain_types.hpp"
 #include <functional>
 #include <list>

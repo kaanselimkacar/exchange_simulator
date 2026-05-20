@@ -1,3 +1,4 @@
+#pragma once
 #include "market.hpp"
 
 namespace Domain::MatchingEngine {
