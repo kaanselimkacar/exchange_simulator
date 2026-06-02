@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "domain/market.hpp"
+#include <gtest/gtest.h>
 // domain_types.hpp is already included by market.hpp
 
 namespace Domain::Market::Testing {
@@ -24,21 +24,19 @@ constexpr PriceType MAX_INT64_PRICE = 9223372036854775807LL;
 // ============================================================================
 
 class PriceLevelTest : public ::testing::Test {
-protected:
-    PriceLevel price_level_{BASE_PRICE};  // Create a price level at price 100
+  protected:
+    PriceLevel price_level_{BASE_PRICE}; // Create a price level at price 100
 };
 
 TEST_F(PriceLevelTest, AddSingleOrder) {
-    Order order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+
     auto iterator = price_level_.AddOrder(order);
-    
+
     // Verify that the iterator is valid and points to the added order
     EXPECT_EQ(iterator->order_id, 1);
     EXPECT_EQ(iterator->quantity, BASE_QUANTITY);
@@ -46,25 +44,21 @@ TEST_F(PriceLevelTest, AddSingleOrder) {
 }
 
 TEST_F(PriceLevelTest, AddMultipleOrders) {
-    Order order1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order order2{
-        .order_id = 2,
-        .price = BASE_PRICE,
-        .quantity = LARGER_QUANTITY,
-        .side = Side::BID,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+
     auto iter1 = price_level_.AddOrder(order1);
     auto iter2 = price_level_.AddOrder(order2);
-    
+
     // Verify both orders are added correctly
     EXPECT_EQ(iter1->order_id, 1);
     EXPECT_EQ(iter2->order_id, 2);
@@ -73,50 +67,42 @@ TEST_F(PriceLevelTest, AddMultipleOrders) {
 }
 
 TEST_F(PriceLevelTest, AddOrderAccumulatesQuantity) {
-    Order order1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = DOUBLE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order order2{
-        .order_id = 2,
-        .price = BASE_PRICE,
-        .quantity = TRIPLE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = DOUBLE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = TRIPLE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+
     price_level_.AddOrder(order1);
     price_level_.AddOrder(order2);
-    
+
     // The quantity at the price level should be accumulated
     // (This tests the internal state is being updated)
-    EXPECT_TRUE(true);  // The test passes if no assertion fails in AddOrder
+    EXPECT_TRUE(true); // The test passes if no assertion fails in AddOrder
 }
 
 TEST_F(PriceLevelTest, OrdersMaintainFIFOOrder) {
-    Order order1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order order2{
-        .order_id = 2,
-        .price = BASE_PRICE,
-        .quantity = LARGER_QUANTITY,
-        .side = Side::BID,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+
     auto iter1 = price_level_.AddOrder(order1);
     auto iter2 = price_level_.AddOrder(order2);
-    
+
     // iter1 should come before iter2 in the list
     EXPECT_EQ(iter1->order_id, 1);
     EXPECT_EQ(iter2->order_id, 2);
@@ -127,215 +113,180 @@ TEST_F(PriceLevelTest, OrdersMaintainFIFOOrder) {
 // ============================================================================
 
 class OrderbookTest : public ::testing::Test {
-protected:
+  protected:
     Orderbook orderbook_;
 };
 
 TEST_F(OrderbookTest, AddBidOrder) {
-    Order bid_order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order bid_order{.order_id = 1,
+                    .price = BASE_PRICE,
+                    .quantity = BASE_QUANTITY,
+                    .side = Side::BID,
+                    .timestamp = BASE_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(bid_order));
 }
 
 TEST_F(OrderbookTest, AddAskOrder) {
-    Order ask_order{
-        .order_id = 1,
-        .price = HIGHER_PRICE,
-        .quantity = DOUBLE_QUANTITY,
-        .side = Side::ASK,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order ask_order{.order_id = 1,
+                    .price = HIGHER_PRICE,
+                    .quantity = DOUBLE_QUANTITY,
+                    .side = Side::ASK,
+                    .timestamp = BASE_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(ask_order));
 }
 
 TEST_F(OrderbookTest, AddMultipleBidOrders) {
-    Order bid1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order bid2{
-        .order_id = 2,
-        .price = LOWER_PRICE,
-        .quantity = LARGER_QUANTITY,
-        .side = Side::BID,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+
+    Order bid2{.order_id = 2,
+               .price = LOWER_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
     EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
 }
 
 TEST_F(OrderbookTest, AddMultipleAskOrders) {
-    Order ask1{
-        .order_id = 1,
-        .price = HIGHER_PRICE,
-        .quantity = DOUBLE_QUANTITY,
-        .side = Side::ASK,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order ask2{
-        .order_id = 2,
-        .price = MUCH_HIGHER_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::ASK,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order ask1{.order_id = 1,
+               .price = HIGHER_PRICE,
+               .quantity = DOUBLE_QUANTITY,
+               .side = Side::ASK,
+               .timestamp = BASE_TIMESTAMP};
+
+    Order ask2{.order_id = 2,
+               .price = MUCH_HIGHER_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::ASK,
+               .timestamp = NEXT_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(ask1));
     EXPECT_NO_THROW(orderbook_.AddOrder(ask2));
 }
 
 TEST_F(OrderbookTest, AddMixedBidAndAskOrders) {
-    Order bid1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order ask1{
-        .order_id = 2,
-        .price = HIGHER_PRICE,
-        .quantity = LARGER_QUANTITY,
-        .side = Side::ASK,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
-    Order bid2{
-        .order_id = 3,
-        .price = LOWER_PRICE,
-        .quantity = DOUBLE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = LATER_TIMESTAMP
-    };
-    
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+
+    Order ask1{.order_id = 2,
+               .price = HIGHER_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::ASK,
+               .timestamp = NEXT_TIMESTAMP};
+
+    Order bid2{.order_id = 3,
+               .price = LOWER_PRICE,
+               .quantity = DOUBLE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = LATER_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
     EXPECT_NO_THROW(orderbook_.AddOrder(ask1));
     EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
 }
 
 TEST_F(OrderbookTest, MultipleOrdersAtSamePrice) {
-    Order bid1{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
-    Order bid2{
-        .order_id = 2,
-        .price = BASE_PRICE,
-        .quantity = LARGER_QUANTITY,
-        .side = Side::BID,
-        .timestamp = NEXT_TIMESTAMP
-    };
-    
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+
+    Order bid2{.order_id = 2,
+               .price = BASE_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
     EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroQuantity) {
-    Order invalid_order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = 0,  // Invalid: zero quantity
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order invalid_order{.order_id = 1,
+                        .price = BASE_PRICE,
+                        .quantity = 0, // Invalid: zero quantity
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
     // Should trigger an assertion failure
     EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
 TEST_F(OrderbookTest, RejectOrderWithNegativeQuantity) {
-    Order invalid_order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = static_cast<QuantityType>(-1),  // NOLINT: intentional invalid value
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order invalid_order{.order_id = 1,
+                        .price = BASE_PRICE,
+                        .quantity =
+                            static_cast<QuantityType>(-1), // NOLINT: intentional invalid value
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
     // Should still work since quantity is uint64_t, but semantically it's invalid
     // This test documents the current behavior
     EXPECT_NO_THROW(orderbook_.AddOrder(invalid_order));
 }
 
 TEST_F(OrderbookTest, RejectOrderWithInvalidSide) {
-    Order invalid_order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::INVALID,  // Invalid side
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order invalid_order{.order_id = 1,
+                        .price = BASE_PRICE,
+                        .quantity = BASE_QUANTITY,
+                        .side = Side::INVALID, // Invalid side
+                        .timestamp = BASE_TIMESTAMP};
+
     // Should trigger an assertion failure
     EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroOrderId) {
-    Order invalid_order{
-        .order_id = 0,  // Invalid: zero order ID
-        .price = BASE_PRICE,
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order invalid_order{.order_id = 0, // Invalid: zero order ID
+                        .price = BASE_PRICE,
+                        .quantity = BASE_QUANTITY,
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
     // Should trigger an assertion failure
     EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroPrice) {
-    Order invalid_order{
-        .order_id = 1,
-        .price = 0,  // Invalid: zero price
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order invalid_order{.order_id = 1,
+                        .price = 0, // Invalid: zero price
+                        .quantity = BASE_QUANTITY,
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
     // Should trigger an assertion failure
     EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
 TEST_F(OrderbookTest, LargeQuantityOrder) {
-    Order large_order{
-        .order_id = 1,
-        .price = BASE_PRICE,
-        .quantity = LARGE_QUANTITY_CONST,  // Very large quantity
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order large_order{.order_id = 1,
+                      .price = BASE_PRICE,
+                      .quantity = LARGE_QUANTITY_CONST, // Very large quantity
+                      .side = Side::BID,
+                      .timestamp = BASE_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(large_order));
 }
 
 TEST_F(OrderbookTest, LargePriceOrder) {
-    Order large_price_order{
-        .order_id = 1,
-        .price = MAX_INT64_PRICE,  // Max int64_t
-        .quantity = BASE_QUANTITY,
-        .side = Side::BID,
-        .timestamp = BASE_TIMESTAMP
-    };
-    
+    Order large_price_order{.order_id = 1,
+                            .price = MAX_INT64_PRICE, // Max int64_t
+                            .quantity = BASE_QUANTITY,
+                            .side = Side::BID,
+                            .timestamp = BASE_TIMESTAMP};
+
     EXPECT_NO_THROW(orderbook_.AddOrder(large_price_order));
 }
 
-}  // namespace Domain::Market::Testing
+} // namespace Domain::Market::Testing
