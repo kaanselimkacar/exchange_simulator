@@ -1,7 +1,14 @@
 #pragma once
 
+#include <format>
 #include <source_location>
 #include <string>
+
+#ifdef DEBUG_BUILD
+inline constexpr bool kDebugBuild = true;
+#else
+inline constexpr bool kDebugBuild = false;
+#endif
 
 class Logger {
   public:
@@ -39,19 +46,48 @@ class Logger {
     virtual void error_impl_internal(const std::string &msg, const std::source_location &loc) = 0;
 };
 
-#ifdef DEBUG_BUILD
-#define LOG_DEBUG(fmt, ...)                                                                        \
-    Logger::instance().debug_impl(std::format(fmt, ##__VA_ARGS__), std::source_location::current())
+namespace detail {
+template<typename... Args>
+void LogDebugImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
+    if constexpr (kDebugBuild) {
+        Logger::instance().debug_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
+    }
+}
 
-#define LOG_INFO(fmt, ...)                                                                         \
-    Logger::instance().info_impl(std::format(fmt, ##__VA_ARGS__), std::source_location::current())
-#else
-#define LOG_DEBUG(fmt, ...) (void)sizeof(fmt), (void)sizeof(##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) (void)sizeof(fmt), (void)sizeof(##__VA_ARGS__)
-#endif
+template<typename... Args>
+void LogInfoImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
+    if constexpr (kDebugBuild) {
+        Logger::instance().info_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
+    }
+}
 
-#define LOG_WARN(fmt, ...)                                                                         \
-    Logger::instance().warn_impl(std::format(fmt, ##__VA_ARGS__), std::source_location::current())
+template<typename... Args>
+void LogWarnImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
+    Logger::instance().warn_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
+}
 
-#define LOG_ERROR(fmt, ...)                                                                        \
-    Logger::instance().error_impl(std::format(fmt, ##__VA_ARGS__), std::source_location::current())
+template<typename... Args>
+void LogErrorImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
+    Logger::instance().error_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
+}
+} // namespace detail
+
+template<typename... Args>
+void LogDebug(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogDebugImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+void LogInfo(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogInfoImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+void LogWarn(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogWarnImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+void LogError(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogErrorImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+}

@@ -1,5 +1,6 @@
 #include "market.hpp"
 #include <cassert>
+#include <common/logger.hpp>
 
 namespace Domain::Market {
 
@@ -28,5 +29,6 @@ auto Orderbook::AddOrder(const Order &order) -> void {
     } else {
         add_order(order, bids_, orders_);
     }
+    LogInfo("Order[{}] added to orderbook[{}]", order.order_id, orderbook_id_);
 };
 }; // namespace Domain::Market

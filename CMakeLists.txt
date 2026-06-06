@@ -18,15 +18,14 @@ target_compile_options(project_warnings INTERFACE
 # --- Clang-Tidy Integration ---
 find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
 if(CLANG_TIDY_EXE)
+    set(CLANG_TIDY_ARGS "--header-filter=.*")
     if(DEFINED ENV{NIX_CFLAGS_COMPILE})
         separate_arguments(NIX_FLAGS NATIVE_COMMAND "$ENV{NIX_CFLAGS_COMPILE}")
-        set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
         foreach(flag ${NIX_FLAGS})
-            list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg-before=${flag}")
+            list(APPEND CLANG_TIDY_ARGS "--extra-arg-before=${flag}")
         endforeach()
-    else()
-        set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
     endif()
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE} ${CLANG_TIDY_ARGS})
 endif()
 
 # --- Clang-Format Target ---
