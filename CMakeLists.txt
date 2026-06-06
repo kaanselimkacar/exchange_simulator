@@ -16,11 +16,18 @@ target_compile_options(project_warnings INTERFACE
 )
 
 # --- Clang-Tidy Integration ---
-# Disabled due to header parsing issues with cstdint in nix environment
-# find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
-# if(CLANG_TIDY_EXE)
-#     set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE} "--extra-arg=-Wno-unknown-warning-option")
-# endif()
+find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+if(CLANG_TIDY_EXE)
+    if(DEFINED ENV{NIX_CFLAGS_COMPILE})
+        separate_arguments(NIX_FLAGS NATIVE_COMMAND "$ENV{NIX_CFLAGS_COMPILE}")
+        set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
+        foreach(flag ${NIX_FLAGS})
+            list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg-before=${flag}")
+        endforeach()
+    else()
+        set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
+    endif()
+endif()
 
 # --- Clang-Format Target ---
 find_program(CLANG_FORMAT_EXE NAMES "clang-format")

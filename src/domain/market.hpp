@@ -17,7 +17,7 @@ class PriceLevel {
     }
 
   private:
-    PriceType price_;
+    [[maybe_unused]] PriceType price_;
     QuantityType quantity_{Invalid<QuantityType>};
     OrderListType order_list_;
 };
@@ -33,7 +33,7 @@ class Orderbook {
         OrderListIterator iterator_;
     };
 
-    OrderbookIdType orderbook_id_{Invalid<OrderbookIdType>};
+    [[maybe_unused]] OrderbookIdType orderbook_id_{Invalid<OrderbookIdType>};
 
     std::map<PriceType, PriceLevel, std::greater<>> bids_;
     std::map<PriceType, PriceLevel, std::less<>> asks_;
