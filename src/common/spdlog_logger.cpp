@@ -40,26 +40,18 @@ auto format_location(const std::source_location &loc) -> std::string {
 }
 } // namespace
 
-void SpdlogLogger::debug_impl_internal(
-    const std::string &msg,
-    const std::source_location &loc) {
+void SpdlogLogger::debug_impl_internal(const std::string &msg, const std::source_location &loc) {
     spdlog_instance_->debug("[{}] {}", format_location(loc), msg);
 }
 
-void SpdlogLogger::info_impl_internal(
-    const std::string &msg,
-    const std::source_location &loc) {
+void SpdlogLogger::info_impl_internal(const std::string &msg, const std::source_location &loc) {
     spdlog_instance_->info("[{}] {}", format_location(loc), msg);
 }
 
-void SpdlogLogger::warn_impl_internal(
-    const std::string &msg,
-    const std::source_location &loc) {
+void SpdlogLogger::warn_impl_internal(const std::string &msg, const std::source_location &loc) {
     spdlog_instance_->warn("[{}] {}", format_location(loc), msg);
 }
 
-void SpdlogLogger::error_impl_internal(
-    const std::string &msg,
-    const std::source_location &loc) {
+void SpdlogLogger::error_impl_internal(const std::string &msg, const std::source_location &loc) {
     spdlog_instance_->error("[{}] {}", format_location(loc), msg);
 }

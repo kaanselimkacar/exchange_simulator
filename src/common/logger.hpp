@@ -16,23 +16,19 @@ class Logger {
 
     static auto instance() -> Logger &;
 
-    void debug_impl(const std::string &msg,
-                    const std::source_location &loc) {
+    void debug_impl(const std::string &msg, const std::source_location &loc) {
         debug_impl_internal(msg, loc);
     }
 
-    void info_impl(const std::string &msg,
-                   const std::source_location &loc) {
+    void info_impl(const std::string &msg, const std::source_location &loc) {
         info_impl_internal(msg, loc);
     }
 
-    void warn_impl(const std::string &msg,
-                   const std::source_location &loc) {
+    void warn_impl(const std::string &msg, const std::source_location &loc) {
         warn_impl_internal(msg, loc);
     }
 
-    void error_impl(const std::string &msg,
-                    const std::source_location &loc) {
+    void error_impl(const std::string &msg, const std::source_location &loc) {
         error_impl_internal(msg, loc);
     }
 
