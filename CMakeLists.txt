@@ -32,6 +32,7 @@ endif()
 find_program(CLANG_FORMAT_EXE NAMES "clang-format")
 if(CLANG_FORMAT_EXE)
     file(GLOB_RECURSE ALL_SOURCE_FILES *.cpp *.hpp *.h)
+    list(FILTER ALL_SOURCE_FILES EXCLUDE REGEX ".*/third_party/.*")
     add_custom_target(format
         COMMAND ${CLANG_FORMAT_EXE} -i -style=file ${ALL_SOURCE_FILES}
     )
