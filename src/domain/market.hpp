@@ -12,19 +12,23 @@ using OrderListIterator = std::list<Order>::iterator;
 
 class PriceLevel {
   public:
-    auto AddOrder(const Order &order) -> OrderListIterator;
     PriceLevel(PriceType price) : price_(price) {
     }
+    auto AddOrder(const Order &order) -> OrderListIterator;
+    auto IsEmpty() -> bool;
+    auto DeleteOrder(OrderListIterator order_list_iterator) -> void;
 
   private:
     [[maybe_unused]] PriceType price_;
-    QuantityType quantity_{Invalid<QuantityType>};
+    QuantityType quantity_{0};
     OrderListType order_list_;
 };
 
 class Orderbook {
   public:
     auto AddOrder(const Order &order) -> void;
+    //    auto ModifyOrder() -> void;
+    auto DeleteOrder(OrderIdType order_id) -> void;
 
   private:
     struct OrderLocation {

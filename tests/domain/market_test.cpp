@@ -289,4 +289,266 @@ TEST_F(OrderbookTest, LargePriceOrder) {
     EXPECT_NO_THROW(orderbook_.AddOrder(large_price_order));
 }
 
+// ============================================================================
+// PriceLevel DeleteOrder & IsEmpty Tests
+// ============================================================================
+
+TEST_F(PriceLevelTest, IsEmptyInitially) {
+    EXPECT_TRUE(price_level_.IsEmpty());
+}
+
+TEST_F(PriceLevelTest, IsEmptyAfterAdd) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    price_level_.AddOrder(order);
+    EXPECT_FALSE(price_level_.IsEmpty());
+}
+
+TEST_F(PriceLevelTest, IsEmptyAfterAddDelete) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    auto iter = price_level_.AddOrder(order);
+    price_level_.DeleteOrder(iter);
+    EXPECT_TRUE(price_level_.IsEmpty());
+}
+
+TEST_F(PriceLevelTest, DeleteSingleOrder) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    auto iter = price_level_.AddOrder(order);
+    EXPECT_FALSE(price_level_.IsEmpty());
+    price_level_.DeleteOrder(iter);
+    EXPECT_TRUE(price_level_.IsEmpty());
+}
+
+TEST_F(PriceLevelTest, DeleteFromMultipleOrders) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    Order order3{.order_id = 3,
+                 .price = BASE_PRICE,
+                 .quantity = DOUBLE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = LATER_TIMESTAMP};
+
+    auto iter1 = price_level_.AddOrder(order1);
+    auto iter2 = price_level_.AddOrder(order2);
+    auto iter3 = price_level_.AddOrder(order3);
+
+    // Delete the middle order
+    price_level_.DeleteOrder(iter2);
+
+    // Remaining iterators should still be valid
+    EXPECT_EQ(iter1->order_id, 1);
+    EXPECT_EQ(iter3->order_id, 3);
+    EXPECT_FALSE(price_level_.IsEmpty());
+
+    // Add a 4th order to verify list is functional after deletion
+    Order order4{.order_id = 4,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    auto iter4 = price_level_.AddOrder(order4);
+    EXPECT_EQ(iter4->order_id, 4);
+
+    // Delete remaining orders one by one
+    price_level_.DeleteOrder(iter1);
+    EXPECT_FALSE(price_level_.IsEmpty());
+    price_level_.DeleteOrder(iter3);
+    EXPECT_FALSE(price_level_.IsEmpty());
+    price_level_.DeleteOrder(iter4);
+    EXPECT_TRUE(price_level_.IsEmpty());
+}
+
+TEST_F(PriceLevelTest, DeleteAllOrders) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+
+    auto iter1 = price_level_.AddOrder(order1);
+    auto iter2 = price_level_.AddOrder(order2);
+
+    EXPECT_FALSE(price_level_.IsEmpty());
+    price_level_.DeleteOrder(iter1);
+    EXPECT_FALSE(price_level_.IsEmpty());
+    price_level_.DeleteOrder(iter2);
+    EXPECT_TRUE(price_level_.IsEmpty());
+}
+
+// ============================================================================
+// Orderbook DeleteOrder Tests
+// ============================================================================
+
+TEST_F(OrderbookTest, DeleteBidOrder) {
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, DeleteAskOrder) {
+    Order ask{.order_id = 1,
+              .price = HIGHER_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::ASK,
+              .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(ask);
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, DeleteOrderAtSamePriceLevel) {
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+    Order bid2{.order_id = 2,
+               .price = BASE_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid1);
+    orderbook_.AddOrder(bid2);
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, DeleteOrderFromMultiLevel) {
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+    Order bid2{.order_id = 2,
+               .price = LOWER_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid1);
+    orderbook_.AddOrder(bid2);
+
+    // Delete the order at the higher price level
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+
+    // Should still be able to interact with the remaining price level
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, DeleteCrossSideOrders) {
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    Order ask{.order_id = 2,
+              .price = HIGHER_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::ASK,
+              .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+    orderbook_.AddOrder(ask);
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, DeleteNonexistentOrder) {
+    EXPECT_DEATH(orderbook_.DeleteOrder(999), "");
+}
+
+TEST_F(OrderbookTest, DeleteThenReAddSameOrderId) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+    orderbook_.DeleteOrder(1);
+
+    // Re-adding the same order_id should succeed
+    Order re_add{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.AddOrder(re_add));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, DuplicateOrderIdSilentlyIgnored) {
+    Order first{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    Order second{.order_id = 1,
+                 .price = LOWER_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(first);
+    // Second add with same order_id: order is added to the price level at
+    // LOWER_PRICE, but orders_ map silently keeps the first entry.
+    // Current behavior: no assert, no crash.
+    EXPECT_NO_THROW(orderbook_.AddOrder(second));
+
+    // Deleting order_id 1 removes the first order (at BASE_PRICE)
+    // since orders_[1] still points there.
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+    Order bid2{.order_id = 2,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid1);
+    orderbook_.AddOrder(bid2);
+
+    // Delete the first order — price level still has bid2, so it should persist
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+
+    // Add another order at a fresh price level, then delete the remaining order
+    Order bid3{.order_id = 3,
+               .price = LOWER_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = LATER_TIMESTAMP};
+    orderbook_.AddOrder(bid3);
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(3));
+}
+
 } // namespace Domain::Market::Testing

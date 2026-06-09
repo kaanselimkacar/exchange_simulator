@@ -47,47 +47,48 @@ class Logger {
 };
 
 namespace detail {
-template<typename... Args>
+template <typename... Args>
 void LogDebugImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
     if constexpr (kDebugBuild) {
-        Logger::instance().debug_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
+        Logger::instance().debug_impl(std::format(std::move(fmt), std::forward<Args>(args)...),
+                                      loc);
     }
 }
 
-template<typename... Args>
+template <typename... Args>
 void LogInfoImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
     if constexpr (kDebugBuild) {
         Logger::instance().info_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
     }
 }
 
-template<typename... Args>
+template <typename... Args>
 void LogWarnImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
     Logger::instance().warn_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
 }
 
-template<typename... Args>
+template <typename... Args>
 void LogErrorImpl(std::source_location loc, std::format_string<Args...> fmt, Args &&...args) {
     Logger::instance().error_impl(std::format(std::move(fmt), std::forward<Args>(args)...), loc);
 }
 } // namespace detail
 
-template<typename... Args>
-void LogDebug(std::format_string<Args...> fmt, Args &&...args) {
-    detail::LogDebugImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+template <typename... Args> void LogDebug(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogDebugImpl(std::source_location::current(), std::move(fmt),
+                         std::forward<Args>(args)...);
 }
 
-template<typename... Args>
-void LogInfo(std::format_string<Args...> fmt, Args &&...args) {
-    detail::LogInfoImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+template <typename... Args> void LogInfo(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogInfoImpl(std::source_location::current(), std::move(fmt),
+                        std::forward<Args>(args)...);
 }
 
-template<typename... Args>
-void LogWarn(std::format_string<Args...> fmt, Args &&...args) {
-    detail::LogWarnImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+template <typename... Args> void LogWarn(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogWarnImpl(std::source_location::current(), std::move(fmt),
+                        std::forward<Args>(args)...);
 }
 
-template<typename... Args>
-void LogError(std::format_string<Args...> fmt, Args &&...args) {
-    detail::LogErrorImpl(std::source_location::current(), std::move(fmt), std::forward<Args>(args)...);
+template <typename... Args> void LogError(std::format_string<Args...> fmt, Args &&...args) {
+    detail::LogErrorImpl(std::source_location::current(), std::move(fmt),
+                         std::forward<Args>(args)...);
 }
