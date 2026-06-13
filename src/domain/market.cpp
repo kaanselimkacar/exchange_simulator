@@ -9,11 +9,18 @@ auto PriceLevel::AddOrder(const Order &order) -> OrderListIterator {
     return order_list_.emplace(order_list_.end(), order);
 };
 
-auto PriceLevel::IsEmpty() -> bool {
+auto PriceLevel::UpdateQuantity(const QuantityChange &qty_change) -> void {
+    assert(quantity_ + qty_change.new_quantity >= qty_change.old_quantity);
+    quantity_ += qty_change.new_quantity;
+    quantity_ -= qty_change.old_quantity;
+}
+
+auto PriceLevel::IsEmpty() const -> bool {
     return order_list_.empty();
 };
 
 auto PriceLevel::DeleteOrder(OrderListIterator order_list_iterator) -> void {
+    assert(quantity_ >= order_list_iterator->quantity);
     quantity_ -= order_list_iterator->quantity;
     order_list_.erase(order_list_iterator);
 };
@@ -41,6 +48,27 @@ auto Orderbook::AddOrder(const Order &order) -> void {
     LogInfo("Order[{}] added to orderbook[{}]", order.order_id, orderbook_id_);
 };
 
+auto Orderbook::ModifyOrder(const Order &updated_order) -> void {
+    auto old_order_iter = orders_.find(updated_order.order_id);
+    assert(old_order_iter != orders_.end());
+
+    auto &old_order_location = old_order_iter->second;
+    auto old_price = old_order_location.iterator_->price;
+    // auto old_quantity = old_order_location.iterator_->quantity;
+    auto old_side = old_order_location.iterator_->side;
+
+    assert(old_side == updated_order.side);
+    // check if there is a update to price
+    if (updated_order.price != Invalid<PriceType> && updated_order.price != old_price) {
+        // perform delete & add
+        DeleteOrder(updated_order.order_id);
+        AddOrder(updated_order);
+    } else {
+        // perform quantity update only, preserving price time prio
+        ModifyOrderQuantity(updated_order.quantity, old_order_location);
+    }
+};
+
 auto Orderbook::DeleteOrder(const OrderIdType order_id) -> void {
     auto order_iter = orders_.find(order_id);
     assert(order_iter != orders_.end());
@@ -62,6 +90,14 @@ auto Orderbook::DeleteOrder(const OrderIdType order_id) -> void {
         }
     }
     orders_.erase(order_iter);
+}
+
+auto Orderbook::ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
+    -> void {
+    auto old_quantity = old_order_location.iterator_->quantity;
+    old_order_location.price_level_.get().UpdateQuantity(
+        {.new_quantity = new_quantity, .old_quantity = old_quantity});
+    old_order_location.iterator_->quantity = new_quantity;
 }
 
 }; // namespace Domain::Market

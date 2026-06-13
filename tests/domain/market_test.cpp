@@ -18,6 +18,7 @@ constexpr TimestampType NEXT_TIMESTAMP = 1001;
 constexpr TimestampType LATER_TIMESTAMP = 1002;
 constexpr TimestampType LARGE_QUANTITY_CONST = 1000000000000ULL;
 constexpr PriceType MAX_INT64_PRICE = 9223372036854775807LL;
+constexpr OrderIdType NONEXISTENT_ORDER_ID = 100;
 
 // ============================================================================
 // PriceLevel Tests
@@ -525,15 +526,15 @@ TEST_F(OrderbookTest, DuplicateOrderIdSilentlyIgnored) {
 
 TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
     Order bid1{.order_id = 1,
-               .price = BASE_PRICE,
-               .quantity = BASE_QUANTITY,
-               .side = Side::BID,
-               .timestamp = BASE_TIMESTAMP};
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
     Order bid2{.order_id = 2,
-               .price = BASE_PRICE,
-               .quantity = BASE_QUANTITY,
-               .side = Side::BID,
-               .timestamp = NEXT_TIMESTAMP};
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = NEXT_TIMESTAMP};
     orderbook_.AddOrder(bid1);
     orderbook_.AddOrder(bid2);
 
@@ -542,13 +543,495 @@ TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
 
     // Add another order at a fresh price level, then delete the remaining order
     Order bid3{.order_id = 3,
-               .price = LOWER_PRICE,
-               .quantity = BASE_QUANTITY,
-               .side = Side::BID,
-               .timestamp = LATER_TIMESTAMP};
+                .price = LOWER_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = LATER_TIMESTAMP};
     orderbook_.AddOrder(bid3);
     EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
     EXPECT_NO_THROW(orderbook_.DeleteOrder(3));
+}
+
+// ============================================================================
+// PriceLevel UpdateQuantity Tests
+// ============================================================================
+
+TEST_F(PriceLevelTest, UpdateQuantityIncrease) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    price_level_.AddOrder(order1);
+    price_level_.AddOrder(order2);
+
+    EXPECT_NO_THROW(
+        price_level_.UpdateQuantity({.new_quantity = DOUBLE_QUANTITY, .old_quantity = BASE_QUANTITY}));
+}
+
+TEST_F(PriceLevelTest, UpdateQuantityDecrease) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = TRIPLE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    price_level_.AddOrder(order1);
+    price_level_.AddOrder(order2);
+
+    EXPECT_NO_THROW(
+        price_level_.UpdateQuantity({.new_quantity = BASE_QUANTITY, .old_quantity = TRIPLE_QUANTITY}));
+}
+
+TEST_F(PriceLevelTest, UpdateQuantityNoChange) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    price_level_.AddOrder(order1);
+
+    EXPECT_NO_THROW(
+        price_level_.UpdateQuantity({.new_quantity = BASE_QUANTITY, .old_quantity = BASE_QUANTITY}));
+}
+
+// ============================================================================
+// Orderbook ModifyOrder Tests — Quantity Only (In-Place, Same Price)
+// ============================================================================
+
+TEST_F(OrderbookTest, ModifyBidQuantityIncrease) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyBidQuantityDecrease) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = DOUBLE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyAskQuantityIncrease) {
+    Order order{.order_id = 1,
+                .price = HIGHER_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::ASK,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyAskQuantityDecrease) {
+    Order order{.order_id = 1,
+                .price = HIGHER_PRICE,
+                .quantity = DOUBLE_QUANTITY,
+                .side = Side::ASK,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyOrderSamePriceExplicitly) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = BASE_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyOrderSameQuantityNoChange) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyOrderMultipleTimes) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order mod1{.order_id = 1,
+               .price = Invalid<PriceType>,
+               .quantity = DOUBLE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod1));
+
+    Order mod2{.order_id = 1,
+               .price = Invalid<PriceType>,
+               .quantity = TRIPLE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod2));
+
+    // Modify with explicit same price after sentinel modifies
+    Order mod3{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = DOUBLE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod3));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyOrderThenDeleteSameOrder) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+// ============================================================================
+// Orderbook ModifyOrder Tests — Price Change (Delete + Add)
+// ============================================================================
+
+TEST_F(OrderbookTest, ModifyBidPriceChangeToHigher) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = HIGHER_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyBidPriceChangeToLower) {
+    Order order{.order_id = 1,
+                .price = HIGHER_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = BASE_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyAskPriceChangeToHigher) {
+    Order order{.order_id = 1,
+                .price = HIGHER_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::ASK,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = MUCH_HIGHER_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyAskPriceChangeToLower) {
+    Order order{.order_id = 1,
+                .price = MUCH_HIGHER_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::ASK,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = HIGHER_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+// ============================================================================
+// Orderbook ModifyOrder Tests — Multi-Level & Multi-Order Interop
+// ============================================================================
+
+TEST_F(OrderbookTest, ModifyOrderPreservesOtherOrdersAtSamePriceLevel) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(order1);
+    orderbook_.AddOrder(order2);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+}
+
+TEST_F(OrderbookTest, ModifyOrderToNewPriceLevel) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(order1);
+    orderbook_.AddOrder(order2);
+
+    Order modified{.order_id = 2,
+                   .price = HIGHER_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, ModifyOrderToExistingPriceLevel) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = HIGHER_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(order1);
+    orderbook_.AddOrder(order2);
+
+    Order modified{.order_id = 2,
+                   .price = BASE_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, ModifyOrderFromPriceLevelWithMultipleOrders) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    Order order3{.order_id = 3,
+                 .price = BASE_PRICE,
+                 .quantity = DOUBLE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = LATER_TIMESTAMP};
+    orderbook_.AddOrder(order1);
+    orderbook_.AddOrder(order2);
+    orderbook_.AddOrder(order3);
+
+    // Move order2 away — BASE_PRICE level still has order1 and order3
+    Order modified{.order_id = 2,
+                   .price = HIGHER_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = BASE_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(3));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, ModifyOrderToPriceLevelThatEmptiesSourceLevel) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    Order order2{.order_id = 2,
+                 .price = HIGHER_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(order1);
+    orderbook_.AddOrder(order2);
+
+    // Move the only order at HIGHER_PRICE to BASE_PRICE — HIGHER_PRICE level empties
+    Order modified{.order_id = 2,
+                   .price = BASE_PRICE,
+                   .quantity = LARGER_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, ModifyCrossSideOrdersWithPriceChange) {
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    Order ask{.order_id = 2,
+              .price = HIGHER_PRICE,
+              .quantity = LARGER_QUANTITY,
+              .side = Side::ASK,
+              .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+    orderbook_.AddOrder(ask);
+
+    Order modified{.order_id = 2,
+                   .price = MUCH_HIGHER_PRICE,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+TEST_F(OrderbookTest, ModifyBidCrossesAskSide) {
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    Order ask{.order_id = 2,
+              .price = HIGHER_PRICE,
+              .quantity = LARGER_QUANTITY,
+              .side = Side::ASK,
+              .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+    orderbook_.AddOrder(ask);
+
+    // Move bid above ask — the orderbook allows crosses; matching engine handles them later
+    Order modified{.order_id = 1,
+                   .price = MUCH_HIGHER_PRICE,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+}
+
+// ============================================================================
+// Orderbook ModifyOrder Tests — Edge Cases & Death Tests
+// ============================================================================
+
+TEST_F(OrderbookTest, ModifyNonexistentOrder) {
+    Order modified{.order_id = NONEXISTENT_ORDER_ID,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = BASE_TIMESTAMP};
+    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
 }
 
 } // namespace Domain::Market::Testing

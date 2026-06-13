@@ -25,7 +25,9 @@ cmake --build .
 
 ## Tests
 
-Tests are in `tests/domain/`. Run manually:
+Tests are in `tests/domain/`. Debug builds auto-build and run tests (via CTest), which
+reports the test suite as a single pass/fail. To see every individual `TEST_F` case:
+
 ```bash
 cd build
 ./tests/market_tests

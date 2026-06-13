@@ -14,8 +14,15 @@ class PriceLevel {
   public:
     PriceLevel(PriceType price) : price_(price) {
     }
+
+    struct QuantityChange {
+        QuantityType new_quantity;
+        QuantityType old_quantity;
+    };
+
     auto AddOrder(const Order &order) -> OrderListIterator;
-    auto IsEmpty() -> bool;
+    auto UpdateQuantity(const QuantityChange &qty_change) -> void;
+    [[nodiscard]] auto IsEmpty() const -> bool;
     auto DeleteOrder(OrderListIterator order_list_iterator) -> void;
 
   private:
@@ -27,7 +34,7 @@ class PriceLevel {
 class Orderbook {
   public:
     auto AddOrder(const Order &order) -> void;
-    //    auto ModifyOrder() -> void;
+    auto ModifyOrder(const Order &updated_order) -> void;
     auto DeleteOrder(OrderIdType order_id) -> void;
 
   private:
@@ -36,6 +43,9 @@ class Orderbook {
         std::reference_wrapper<PriceLevel> price_level_;
         OrderListIterator iterator_;
     };
+
+    static auto ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
+        -> void;
 
     [[maybe_unused]] OrderbookIdType orderbook_id_{Invalid<OrderbookIdType>};
 
