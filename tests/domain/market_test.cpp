@@ -19,6 +19,7 @@ constexpr TimestampType LATER_TIMESTAMP = 1002;
 constexpr TimestampType LARGE_QUANTITY_CONST = 1000000000000ULL;
 constexpr PriceType MAX_INT64_PRICE = 9223372036854775807LL;
 constexpr OrderIdType NONEXISTENT_ORDER_ID = 100;
+constexpr OrderbookIdType ORDERBOOK_ID = 1;
 
 // ============================================================================
 // PriceLevel Tests
@@ -115,7 +116,7 @@ TEST_F(PriceLevelTest, OrdersMaintainFIFOOrder) {
 
 class OrderbookTest : public ::testing::Test {
   protected:
-    Orderbook orderbook_;
+    Orderbook orderbook_{ORDERBOOK_ID};
 };
 
 TEST_F(OrderbookTest, AddBidOrder) {

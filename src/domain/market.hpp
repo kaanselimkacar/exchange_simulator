@@ -25,17 +25,27 @@ class PriceLevel {
     [[nodiscard]] auto IsEmpty() const -> bool;
     auto DeleteOrder(OrderListIterator order_list_iterator) -> void;
 
+    [[nodiscard]] auto GetPrice() const -> PriceType {
+        return price_;
+    };
+
   private:
-    [[maybe_unused]] PriceType price_;
+    PriceType price_;
     QuantityType quantity_{0};
     OrderListType order_list_;
 };
 
 class Orderbook {
   public:
+    Orderbook(OrderbookIdType orderbook_id) : orderbook_id_(orderbook_id) {
+    }
     auto AddOrder(const Order &order) -> void;
     auto ModifyOrder(const Order &updated_order) -> void;
     auto DeleteOrder(OrderIdType order_id) -> void;
+
+    [[nodiscard]] auto GetOrderbookId() const -> OrderbookIdType {
+        return orderbook_id_;
+    }
 
   private:
     struct OrderLocation {
@@ -47,7 +57,7 @@ class Orderbook {
     static auto ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
         -> void;
 
-    [[maybe_unused]] OrderbookIdType orderbook_id_{Invalid<OrderbookIdType>};
+    OrderbookIdType orderbook_id_;
 
     std::map<PriceType, PriceLevel, std::greater<>> bids_;
     std::map<PriceType, PriceLevel, std::less<>> asks_;
