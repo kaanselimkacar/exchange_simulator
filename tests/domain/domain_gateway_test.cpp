@@ -1,7 +1,7 @@
-#include "top_level.hpp"
+#include "domain_gateway.hpp"
 #include <gtest/gtest.h>
 
-namespace Domain::TopLevel::Testing {
+namespace Domain::DomainGateway::Testing {
 
 // Test constants to satisfy clang-tidy rules
 constexpr PriceType BASE_PRICE = 100;
@@ -13,14 +13,14 @@ constexpr OrderIdType INCOMING_ORDER_1 = 101;
 constexpr OrderIdType INCOMING_ORDER_2 = 102;
 constexpr OrderbookIdType ORDER_BOOK_ID = 1;
 
-// TODO(top_level): un-skip these tests once src/top_level.hpp exposes a real
+// TODO(domain_gateway): un-skip these tests once src/domain_gateway.hpp exposes a real
 // public API. The behaviors they pin (resting-order removal, looping an
 // incoming order across successive resting fills, leftover recomputation,
-// time-priority across partial resting fills) are owned by top_level, not by
+// time-priority across partial resting fills) are owned by domain_gateway, not by
 // the matching engine. Today there is no such API, so the bodies are written
-// against the matching engine + orderbook and must be re-targeted at top_level.
+// against the matching engine + orderbook and must be re-targeted at domain_gateway.
 
-class TopLevelTest : public ::testing::Test {
+class DomainGatewayTest : public ::testing::Test {
   protected:
     Market::Orderbook orderbook_{ORDER_BOOK_ID};
     Domain::MatchingEngine::MatchingEngine engine_{};
@@ -35,7 +35,7 @@ void AddRestingAsk(Market::Orderbook &orderbook, OrderIdType order_id, PriceType
                              .timestamp = timestamp});
 }
 
-TEST_F(TopLevelTest, FullyConsumedRestingOrderRemoved) {
+TEST_F(DomainGatewayTest, FullyConsumedRestingOrderRemoved) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     Order incoming{.order_id = INCOMING_ORDER_1,
                    .price = BASE_PRICE,
@@ -45,7 +45,7 @@ TEST_F(TopLevelTest, FullyConsumedRestingOrderRemoved) {
 
     GTEST_SKIP();
 
-    // top_level must consume the resting ask and remove it from the book, so
+    // domain_gateway must consume the resting ask and remove it from the book, so
     // the second incoming order finds an empty book.
     engine_.MatchOrders(incoming, orderbook_);
     auto second_incoming = incoming;
@@ -57,7 +57,7 @@ TEST_F(TopLevelTest, FullyConsumedRestingOrderRemoved) {
     EXPECT_TRUE(trade.ask_order_id == Invalid<OrderIdType>);
 }
 
-TEST_F(TopLevelTest, LoopSingleTradePerCallAcrossOrders) {
+TEST_F(DomainGatewayTest, LoopSingleTradePerCallAcrossOrders) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     AddRestingAsk(orderbook_, 2, BASE_PRICE, BASE_QUANTITY);
     Order incoming{.order_id = INCOMING_ORDER_1,
@@ -68,7 +68,7 @@ TEST_F(TopLevelTest, LoopSingleTradePerCallAcrossOrders) {
 
     GTEST_SKIP();
 
-    // top_level loops MatchOrders until the incoming order is fully filled,
+    // domain_gateway loops MatchOrders until the incoming order is fully filled,
     // updating the book between calls.
     auto first_fill = engine_.MatchOrders(incoming, orderbook_);
     auto second_fill = engine_.MatchOrders(incoming, orderbook_);
@@ -77,7 +77,7 @@ TEST_F(TopLevelTest, LoopSingleTradePerCallAcrossOrders) {
     EXPECT_EQ(second_fill.ask_order_id, 2);
 }
 
-TEST_F(TopLevelTest, LeftoverRecomputedAfterPartialFill) {
+TEST_F(DomainGatewayTest, LeftoverRecomputedAfterPartialFill) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     Order incoming{.order_id = INCOMING_ORDER_1,
                    .price = BASE_PRICE,
@@ -87,12 +87,12 @@ TEST_F(TopLevelTest, LeftoverRecomputedAfterPartialFill) {
 
     GTEST_SKIP();
 
-    // top_level owns the leftover quantity, not the matching engine.
+    // domain_gateway owns the leftover quantity, not the matching engine.
     engine_.MatchOrders(incoming, orderbook_);
     EXPECT_EQ(incoming.quantity, BASE_QUANTITY);
 }
 
-TEST_F(TopLevelTest, PartialRestingFillKeepsTimePriority) {
+TEST_F(DomainGatewayTest, PartialRestingFillKeepsTimePriority) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, DOUBLE_QUANTITY, BASE_TIMESTAMP);
     AddRestingAsk(orderbook_, 2, BASE_PRICE, BASE_QUANTITY, NEXT_TIMESTAMP);
     Order incoming{.order_id = INCOMING_ORDER_1,
@@ -103,7 +103,7 @@ TEST_F(TopLevelTest, PartialRestingFillKeepsTimePriority) {
 
     GTEST_SKIP();
 
-    // top_level must update the partially filled resting order in place so the
+    // domain_gateway must update the partially filled resting order in place so the
     // earliest order keeps time priority for the next match.
     engine_.MatchOrders(incoming, orderbook_);
     auto second_incoming = incoming;
@@ -114,4 +114,4 @@ TEST_F(TopLevelTest, PartialRestingFillKeepsTimePriority) {
     EXPECT_EQ(second_fill.ask_order_id, 1);
 }
 
-} // namespace TopLevel::Testing
+} // namespace Domain::DomainGateway::Testing

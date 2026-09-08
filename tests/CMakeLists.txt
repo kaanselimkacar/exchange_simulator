@@ -34,24 +34,24 @@ target_include_directories(matching_engine_tests PRIVATE ${CMAKE_SOURCE_DIR}/src
 # Register the test
 add_test(NAME MatchingEngineTests COMMAND matching_engine_tests)
 
-# Top level domain tests
-add_executable(top_level_tests domain/top_level_test.cpp)
+# Domain gateway domain tests
+add_executable(domain_gateway_tests domain/domain_gateway_test.cpp)
 
-target_link_libraries(top_level_tests PRIVATE
+target_link_libraries(domain_gateway_tests PRIVATE
     GTest::gtest
     GTest::gtest_main
     src
     project_warnings
 )
 
-target_include_directories(top_level_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(domain_gateway_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Register the test
-add_test(NAME TopLevelTests COMMAND top_level_tests)
+add_test(NAME DomainGatewayTests COMMAND domain_gateway_tests)
 
 # Add custom target to run all tests
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-    DEPENDS market_tests matching_engine_tests top_level_tests
+    DEPENDS market_tests matching_engine_tests domain_gateway_tests
     COMMENT "Running all tests..."
 )

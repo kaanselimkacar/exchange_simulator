@@ -1,4 +1,4 @@
-add_library(src top_level.cpp)
+add_library(src domain_gateway.cpp)
 
 add_subdirectory(domain)
 add_subdirectory(common)
