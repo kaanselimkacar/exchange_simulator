@@ -1035,4 +1035,207 @@ TEST_F(OrderbookTest, ModifyNonexistentOrder) {
     EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
 }
 
+// ============================================================================
+// PriceLevel GetTopOrder Tests
+// ============================================================================
+
+TEST_F(PriceLevelTest, GetTopOrderOnEmptyLevelReturnsDefaultOrder) {
+    auto top = price_level_.GetTopOrder();
+    EXPECT_EQ(top.order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(top.side, Side::INVALID);
+}
+
+TEST_F(PriceLevelTest, GetTopOrderReturnsFirstInsertedOrder) {
+    Order first{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    Order second{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    price_level_.AddOrder(first);
+    price_level_.AddOrder(second);
+
+    auto top = price_level_.GetTopOrder();
+    EXPECT_EQ(top.order_id, 1);
+    EXPECT_EQ(top.price, BASE_PRICE);
+    EXPECT_EQ(top.quantity, BASE_QUANTITY);
+}
+
+TEST_F(PriceLevelTest, GetTopOrderIsNonMutating) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    price_level_.AddOrder(order);
+
+    auto top_first = price_level_.GetTopOrder();
+    auto top_second = price_level_.GetTopOrder();
+    EXPECT_FALSE(price_level_.IsEmpty());
+    EXPECT_EQ(top_first.order_id, 1);
+    EXPECT_EQ(top_second.order_id, 1);
+}
+
+TEST_F(PriceLevelTest, GetTopOrderFollowsQueueAfterDelete) {
+    Order first{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    Order second{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = NEXT_TIMESTAMP};
+    auto first_iter = price_level_.AddOrder(first);
+    price_level_.AddOrder(second);
+
+    price_level_.DeleteOrder(first_iter);
+    auto top = price_level_.GetTopOrder();
+    EXPECT_EQ(top.order_id, 2);
+}
+
+TEST_F(PriceLevelTest, GetTopOrderReturnsHeadByArrivalNotTimestamp) {
+    // First inserted order carries a later timestamp than the second one;
+    // the head is decided by arrival order, not the timestamp field.
+    Order first{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = LATER_TIMESTAMP};
+    Order second{.order_id = 2,
+                 .price = BASE_PRICE,
+                 .quantity = LARGER_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    price_level_.AddOrder(first);
+    price_level_.AddOrder(second);
+
+    auto top = price_level_.GetTopOrder();
+    EXPECT_EQ(top.order_id, 1);
+}
+
+// ============================================================================
+// Orderbook GetTopOrder Tests
+// ============================================================================
+
+TEST_F(OrderbookTest, GetTopOrderOnEmptyBookReturnsDefaultForBothSides) {
+    auto top_bid = orderbook_.GetTopOrder(Side::BID);
+    auto top_ask = orderbook_.GetTopOrder(Side::ASK);
+    EXPECT_EQ(top_bid.order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(top_ask.order_id, Invalid<OrderIdType>);
+}
+
+TEST_F(OrderbookTest, BestBidIsHighestPrice) {
+    Order lower_bid{.order_id = 1,
+                    .price = LOWER_PRICE,
+                    .quantity = BASE_QUANTITY,
+                    .side = Side::BID,
+                    .timestamp = BASE_TIMESTAMP};
+    Order higher_bid{.order_id = 2,
+                     .price = BASE_PRICE,
+                     .quantity = LARGER_QUANTITY,
+                     .side = Side::BID,
+                     .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(lower_bid);
+    orderbook_.AddOrder(higher_bid);
+
+    auto top = orderbook_.GetTopOrder(Side::BID);
+    EXPECT_EQ(top.order_id, 2);
+    EXPECT_EQ(top.price, BASE_PRICE);
+}
+
+TEST_F(OrderbookTest, BestAskIsLowestPrice) {
+    Order higher_ask{.order_id = 1,
+                     .price = MUCH_HIGHER_PRICE,
+                     .quantity = BASE_QUANTITY,
+                     .side = Side::ASK,
+                     .timestamp = BASE_TIMESTAMP};
+    Order lower_ask{.order_id = 2,
+                    .price = HIGHER_PRICE,
+                    .quantity = LARGER_QUANTITY,
+                    .side = Side::ASK,
+                    .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(higher_ask);
+    orderbook_.AddOrder(lower_ask);
+
+    auto top = orderbook_.GetTopOrder(Side::ASK);
+    EXPECT_EQ(top.order_id, 2);
+    EXPECT_EQ(top.price, HIGHER_PRICE);
+}
+
+TEST_F(OrderbookTest, GetTopOrderIsSideIsolated) {
+    // Crossing ask sits below the best bid, but must never surface as a bid.
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    Order crossing_ask{.order_id = 2,
+                       .price = LOWER_PRICE,
+                       .quantity = LARGER_QUANTITY,
+                       .side = Side::ASK,
+                       .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+    orderbook_.AddOrder(crossing_ask);
+
+    auto top_bid = orderbook_.GetTopOrder(Side::BID);
+    auto top_ask = orderbook_.GetTopOrder(Side::ASK);
+    EXPECT_EQ(top_bid.order_id, 1);
+    EXPECT_EQ(top_ask.order_id, 2);
+}
+
+TEST_F(OrderbookTest, SamePriceLevelReturnsSeniorOrder) {
+    Order ask_first{.order_id = 1,
+                    .price = HIGHER_PRICE,
+                    .quantity = BASE_QUANTITY,
+                    .side = Side::ASK,
+                    .timestamp = BASE_TIMESTAMP};
+    Order ask_second{.order_id = 2,
+                     .price = HIGHER_PRICE,
+                     .quantity = LARGER_QUANTITY,
+                     .side = Side::ASK,
+                     .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(ask_first);
+    orderbook_.AddOrder(ask_second);
+
+    auto top = orderbook_.GetTopOrder(Side::ASK);
+    EXPECT_EQ(top.order_id, 1);
+}
+
+TEST_F(OrderbookTest, GetTopOrderTracksModifyAndDelete) {
+    Order bid1{.order_id = 1,
+               .price = BASE_PRICE,
+               .quantity = BASE_QUANTITY,
+               .side = Side::BID,
+               .timestamp = BASE_TIMESTAMP};
+    Order bid2{.order_id = 2,
+               .price = LOWER_PRICE,
+               .quantity = LARGER_QUANTITY,
+               .side = Side::BID,
+               .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid1);
+    orderbook_.AddOrder(bid2);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 1);
+
+    // Move bid1 down to bid2's level: bid2 is senior there and becomes best bid.
+    Order modified{.order_id = 1,
+                   .price = LOWER_PRICE,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = LATER_TIMESTAMP};
+    orderbook_.ModifyOrder(modified);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 2);
+
+    orderbook_.DeleteOrder(2);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 1);
+
+    orderbook_.DeleteOrder(1);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+}
+
 } // namespace Domain::Market::Testing

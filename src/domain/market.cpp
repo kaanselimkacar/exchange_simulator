@@ -1,4 +1,5 @@
 #include "market.hpp"
+#include "domain_types.hpp"
 #include <cassert>
 #include <common/logger.hpp>
 
@@ -24,6 +25,14 @@ auto PriceLevel::DeleteOrder(OrderListIterator order_list_iterator) -> void {
     quantity_ -= order_list_iterator->quantity;
     order_list_.erase(order_list_iterator);
 };
+
+auto PriceLevel::GetTopOrder() const -> Order {
+    if (order_list_.empty()) [[unlikely]] {
+        // TODO: this doesn't check for anything really
+        return {};
+    }
+    return *order_list_.begin();
+}
 
 auto Orderbook::AddOrder(const Order &order) -> void {
     auto add_order = [](const Order &order, auto &side_level, auto &orders_) -> void {
@@ -98,6 +107,16 @@ auto Orderbook::ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &ol
     old_order_location.price_level_.get().UpdateQuantity(
         {.new_quantity = new_quantity, .old_quantity = old_quantity});
     old_order_location.iterator_->quantity = new_quantity;
+}
+
+auto Orderbook::GetTopOrder(const Side &side) const -> Order {
+    const auto get_top_order = [](const auto &side_map) -> Order {
+        if (side_map.empty()) {
+            return {};
+        }
+        return side_map.begin()->second.GetTopOrder();
+    };
+    return side == Side::ASK ? get_top_order(asks_) : get_top_order(bids_);
 }
 
 }; // namespace Domain::Market

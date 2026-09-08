@@ -25,6 +25,7 @@ class PriceLevel {
     [[nodiscard]] auto IsEmpty() const -> bool;
     auto DeleteOrder(OrderListIterator order_list_iterator) -> void;
 
+    [[nodiscard]] auto GetTopOrder() const -> Order;
     [[nodiscard]] auto GetPrice() const -> PriceType {
         return price_;
     };
@@ -43,6 +44,7 @@ class Orderbook {
     auto ModifyOrder(const Order &updated_order) -> void;
     auto DeleteOrder(OrderIdType order_id) -> void;
 
+    [[nodiscard]] auto GetTopOrder(const Side &side) const -> Order;
     [[nodiscard]] auto GetOrderbookId() const -> OrderbookIdType {
         return orderbook_id_;
     }
