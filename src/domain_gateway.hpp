@@ -21,6 +21,8 @@ class DomainGateway {
 
     auto AddOrder(Order &order, OrderbookIdType orderbook_id) -> void;
 
+    auto ModifyOrder(Order &updated_order, OrderbookIdType orderbook_id) -> void;
+
     auto DeleteOrder(DeleteOrderStruct delete_order) -> void;
 
   private:

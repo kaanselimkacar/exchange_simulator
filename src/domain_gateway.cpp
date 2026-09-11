@@ -9,6 +9,12 @@ auto DomainGateway::AddOrder(Order &order, const OrderbookIdType orderbook_id) -
     CheckAndExecuteTrade(order, *orderbook);
 }
 
+auto DomainGateway::ModifyOrder(Order &updated_order, OrderbookIdType orderbook_id) -> void {
+    const auto &orderbook = orderbook_manager_->GetOrderbook(orderbook_id);
+    orderbook->ModifyOrder(updated_order);
+    CheckAndExecuteTrade(updated_order, *orderbook);
+}
+
 auto DomainGateway::DeleteOrder(DeleteOrderStruct delete_order) -> void {
     const auto &orderbook = orderbook_manager_->GetOrderbook(delete_order.orderbook_id);
     orderbook->DeleteOrder(delete_order.order_id);

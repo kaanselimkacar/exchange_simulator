@@ -36,6 +36,10 @@ class DomainGatewayTest : public ::testing::Test {
         gateway_->AddOrder(order, ORDER_BOOK_ID);
     }
 
+    void ModifyOrder(Order &order) {
+        gateway_->ModifyOrder(order, ORDER_BOOK_ID);
+    }
+
     std::unique_ptr<DomainGateway> gateway_; // NOLINT: fixture state, accessed by TEST_F bodies
     Market::Orderbook *book_{nullptr};       // NOLINT: fixture state, accessed by TEST_F bodies
 };
@@ -330,6 +334,234 @@ TEST_F(DomainGatewayTest, DeleteOrderUnknownOrderbookAsserts) {
     AddRestingAsk(*book_, 1, BASE_PRICE, BASE_QUANTITY);
 
     EXPECT_DEATH(gateway_->DeleteOrder({.order_id = 1, .orderbook_id = UNKNOWN_ORDER_BOOK_ID}), "");
+}
+
+// ============================================================================
+// Gateway ModifyOrder tests
+// ============================================================================
+
+TEST_F(DomainGatewayTest, ModifyOrderThroughGatewayIncreasesQuantity) {
+    AddRestingBid(*book_, 1, BASE_PRICE, THIRTY_QUANTITY);
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = SIXTY_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_bid.order_id, 1);
+    EXPECT_EQ(top_bid.quantity, SIXTY_QUANTITY);
+    EXPECT_EQ(top_bid.price, BASE_PRICE);
+}
+
+TEST_F(DomainGatewayTest, ModifyOrderThroughGatewayDecreasesQuantity) {
+    AddRestingBid(*book_, 1, BASE_PRICE, SIXTY_QUANTITY);
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = THIRTY_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_bid.order_id, 1);
+    EXPECT_EQ(top_bid.quantity, THIRTY_QUANTITY);
+    EXPECT_EQ(top_bid.price, BASE_PRICE);
+}
+
+// Price change to a still non-crossing level; the order is re-added at the new
+// price and nothing executes.
+TEST_F(DomainGatewayTest, ModifyOrderPriceChangeStaysNonCrossing) {
+    AddRestingAsk(*book_, 1, BASE_PRICE, BASE_QUANTITY);
+    AddRestingBid(*book_, 2, LOWER_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = BASE_PRICE - 2,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    auto top_ask = book_->GetTopOrder(Side::ASK);
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_ask.order_id, 1);
+    EXPECT_EQ(top_ask.quantity, BASE_QUANTITY);
+    EXPECT_EQ(top_bid.order_id, 2);
+    EXPECT_EQ(top_bid.price, BASE_PRICE - 2);
+    EXPECT_EQ(top_bid.quantity, BASE_QUANTITY);
+}
+
+// A resting bid raised to the ask price crosses; both fully-filled orders
+// disappear from the book.
+TEST_F(DomainGatewayTest, ModifyBidToCrossConsumesRestingAskFully) {
+    AddRestingAsk(*book_, 1, BASE_PRICE, BASE_QUANTITY);
+    AddRestingBid(*book_, 2, LOWER_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = BASE_PRICE,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    EXPECT_EQ(book_->GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(book_->GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+}
+
+// Modified bid only partially fills the larger resting ask; the ask keeps its
+// reduced remainder at the same price.
+TEST_F(DomainGatewayTest, ModifyBidToCrossLeavesRestingAskRemainder) {
+    AddRestingAsk(*book_, 1, BASE_PRICE, DOUBLE_QUANTITY);
+    AddRestingBid(*book_, 2, LOWER_PRICE, SIXTY_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = BASE_PRICE,
+                   .quantity = SIXTY_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    auto top_ask = book_->GetTopOrder(Side::ASK);
+    EXPECT_EQ(top_ask.order_id, 1);
+    EXPECT_EQ(top_ask.quantity, FORTY_QUANTITY);
+    EXPECT_EQ(book_->GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+}
+
+// Quantity increase on the modified bid makes it sweep multiple resting asks.
+TEST_F(DomainGatewayTest, ModifyBidIncreaseSweepsMultipleRestingAsks) {
+    AddRestingAsk(*book_, 1, BASE_PRICE, SIXTY_QUANTITY);
+    AddRestingAsk(*book_, 2, MID_PRICE, SIXTY_QUANTITY);
+    AddRestingBid(*book_, 3, LOWER_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 3,
+                   .price = HIGHER_PRICE,
+                   .quantity = SIXTY_QUANTITY * 2,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    EXPECT_EQ(book_->GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(book_->GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+}
+
+// Modified bid consumes 30 + 60 across two levels and rests the leftover.
+TEST_F(DomainGatewayTest, ModifyBidLeftoverRestsAfterSweep) {
+    AddRestingAsk(*book_, 1, BASE_PRICE, THIRTY_QUANTITY);
+    AddRestingAsk(*book_, 2, MID_PRICE, SIXTY_QUANTITY);
+    AddRestingBid(*book_, 3, LOWER_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 3,
+                   .price = HIGHER_PRICE,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    EXPECT_EQ(book_->GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_bid.order_id, 3);
+    EXPECT_EQ(top_bid.quantity, DOUBLE_QUANTITY - THIRTY_QUANTITY - SIXTY_QUANTITY);
+}
+
+// Ask lowered to the resting bid price crosses; both orders are consumed.
+TEST_F(DomainGatewayTest, ModifyAskToCrossConsumesRestingBidFully) {
+    AddRestingBid(*book_, 1, HIGHER_PRICE, DOUBLE_QUANTITY);
+    AddRestingAsk(*book_, 2, MUCH_HIGHER_PRICE, DOUBLE_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = HIGHER_PRICE,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    EXPECT_EQ(book_->GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(book_->GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+}
+
+// Lowered ask partially consumes the larger resting bid; the bid keeps its
+// remainder.
+TEST_F(DomainGatewayTest, ModifyAskToCrossLeavesBidRemainder) {
+    AddRestingBid(*book_, 1, HIGHER_PRICE, DOUBLE_QUANTITY);
+    AddRestingAsk(*book_, 2, MUCH_HIGHER_PRICE, SIXTY_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = HIGHER_PRICE,
+                   .quantity = SIXTY_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    EXPECT_EQ(book_->GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_bid.order_id, 1);
+    EXPECT_EQ(top_bid.quantity, FORTY_QUANTITY);
+}
+
+// Quantity-only modify preserves time priority at the same price level.
+TEST_F(DomainGatewayTest, ModifyOrderSamePricePreservesTimePriority) {
+    AddRestingBid(*book_, 1, BASE_PRICE, BASE_QUANTITY);
+    AddRestingBid(*book_, 2, BASE_PRICE, THIRTY_QUANTITY);
+    Order modified{.order_id = 2,
+                   .price = Invalid<PriceType>,
+                   .quantity = SIXTY_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    ModifyOrder(modified);
+
+    auto top_bid = book_->GetTopOrder(Side::BID);
+    EXPECT_EQ(top_bid.order_id, 1);
+    EXPECT_EQ(top_bid.quantity, BASE_QUANTITY);
+}
+
+TEST_F(DomainGatewayTest, ModifyThenDeleteThroughGateway) {
+    AddRestingBid(*book_, 1, BASE_PRICE, THIRTY_QUANTITY);
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = SIXTY_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+    ModifyOrder(modified);
+
+    gateway_->DeleteOrder({.order_id = 1, .orderbook_id = ORDER_BOOK_ID});
+
+    EXPECT_EQ(book_->GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+}
+
+TEST_F(DomainGatewayTest, ModifyOrderUnknownOrderIdAsserts) {
+    Order modified{.order_id = INCOMING_ORDER_1,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    EXPECT_DEATH(ModifyOrder(modified), "");
+}
+
+TEST_F(DomainGatewayTest, ModifyOrderUnknownOrderbookAsserts) {
+    AddRestingBid(*book_, 1, BASE_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = DOUBLE_QUANTITY,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    EXPECT_DEATH(gateway_->ModifyOrder(modified, UNKNOWN_ORDER_BOOK_ID), "");
+}
+
+TEST_F(DomainGatewayTest, ModifyOrderSideMismatchAsserts) {
+    AddRestingBid(*book_, 1, BASE_PRICE, BASE_QUANTITY);
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = BASE_QUANTITY,
+                   .side = Side::ASK,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    EXPECT_DEATH(ModifyOrder(modified), "");
 }
 
 // ============================================================================
