@@ -45,10 +45,9 @@ auto Orderbook::AddOrder(const Order &order) -> void {
                         OrderLocation{.price_level_ = price_level, .iterator_ = order_iter});
     };
 
-    assert(order.quantity > 0);
-    assert(order.side != Side::INVALID);
-    assert(order.order_id > 0);
-    assert(order.price > 0);
+    ValidateOrder(order);
+    assert(!orders_.contains(order.order_id));
+
     if (order.side == Side::ASK) {
         add_order(order, asks_, orders_);
     } else {
@@ -65,6 +64,8 @@ auto Orderbook::ModifyOrder(const Order &updated_order) -> void {
     auto old_price = old_order_location.iterator_->price;
     // auto old_quantity = old_order_location.iterator_->quantity;
     auto old_side = old_order_location.iterator_->side;
+
+    assert(updated_order.quantity > 0 && updated_order.quantity != Invalid<QuantityType>);
 
     assert(old_side == updated_order.side);
     // check if there is a update to price
@@ -141,6 +142,13 @@ auto Orderbook::GetTopOrder(const Side &side) const -> Order {
         return side_map.begin()->second.GetTopOrder();
     };
     return side == Side::ASK ? get_top_order(asks_) : get_top_order(bids_);
+}
+
+auto Orderbook::ValidateOrder(const Order &order) -> void {
+    assert(order.quantity > 0 && order.quantity != Invalid<QuantityType>);
+    assert(order.side != Side::INVALID);
+    assert(order.order_id > 0 && order.order_id != Invalid<OrderIdType>);
+    assert(order.price > 0 && order.price != Invalid<PriceType>);
 }
 
 auto OrderbookManager::AddOrderbook(std::unique_ptr<Orderbook> orderbook) -> void {

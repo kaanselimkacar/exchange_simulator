@@ -38,7 +38,6 @@ class PriceLevel {
 };
 
 class Orderbook {
-
   public:
     Orderbook(OrderbookIdType orderbook_id) : orderbook_id_(orderbook_id) {
     }
@@ -67,6 +66,8 @@ class Orderbook {
 
     static auto ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
         -> void;
+
+    static auto ValidateOrder(const Order &order) -> void;
 
     OrderbookIdType orderbook_id_;
 

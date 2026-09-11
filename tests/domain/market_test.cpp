@@ -239,9 +239,9 @@ TEST_F(OrderbookTest, RejectOrderWithNegativeQuantity) {
                         .side = Side::BID,
                         .timestamp = BASE_TIMESTAMP};
 
-    // Should still work since quantity is uint64_t, but semantically it's invalid
-    // This test documents the current behavior
-    EXPECT_NO_THROW(orderbook_.AddOrder(invalid_order));
+    // static_cast<QuantityType>(-1) is UINT64_MAX, the same value as
+    // Invalid<QuantityType>; it must be rejected like any other sentinel.
+    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
 TEST_F(OrderbookTest, RejectOrderWithInvalidSide) {
@@ -274,6 +274,28 @@ TEST_F(OrderbookTest, RejectOrderWithZeroPrice) {
                         .timestamp = BASE_TIMESTAMP};
 
     // Should trigger an assertion failure
+    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+}
+
+TEST_F(OrderbookTest, RejectOrderWithInvalidOrderId) {
+    Order invalid_order{.order_id = Invalid<OrderIdType>,
+                        .price = BASE_PRICE,
+                        .quantity = BASE_QUANTITY,
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
+    // The Invalid sentinel is not a legal order id and must be rejected.
+    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+}
+
+TEST_F(OrderbookTest, RejectOrderWithInvalidPrice) {
+    Order invalid_order{.order_id = 1,
+                        .price = Invalid<PriceType>,
+                        .quantity = BASE_QUANTITY,
+                        .side = Side::BID,
+                        .timestamp = BASE_TIMESTAMP};
+
+    // The Invalid sentinel is not a legal price and must be rejected.
     EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
 }
 
@@ -509,7 +531,7 @@ TEST_F(OrderbookTest, DeleteThenReAddSameOrderId) {
     EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
 }
 
-TEST_F(OrderbookTest, DuplicateOrderIdSilentlyIgnored) {
+TEST_F(OrderbookTest, DuplicateOrderIdRejected) {
     Order first{.order_id = 1,
                 .price = BASE_PRICE,
                 .quantity = BASE_QUANTITY,
@@ -521,14 +543,27 @@ TEST_F(OrderbookTest, DuplicateOrderIdSilentlyIgnored) {
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
     orderbook_.AddOrder(first);
-    // Second add with same order_id: order is added to the price level at
-    // LOWER_PRICE, but orders_ map silently keeps the first entry.
-    // Current behavior: no assert, no crash.
-    EXPECT_NO_THROW(orderbook_.AddOrder(second));
 
-    // Deleting order_id 1 removes the first order (at BASE_PRICE)
-    // since orders_[1] still points there.
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    // A second live order with the same order_id must be rejected before it
+    // can corrupt the price level with an untracked orphan order.
+    EXPECT_DEATH(orderbook_.AddOrder(second), "");
+}
+
+TEST_F(OrderbookTest, DuplicateOrderIdAcrossSidesRejected) {
+    Order bid{.order_id = 1,
+              .price = BASE_PRICE,
+              .quantity = BASE_QUANTITY,
+              .side = Side::BID,
+              .timestamp = BASE_TIMESTAMP};
+    Order ask{.order_id = 1,
+              .price = HIGHER_PRICE,
+              .quantity = LARGER_QUANTITY,
+              .side = Side::ASK,
+              .timestamp = NEXT_TIMESTAMP};
+    orderbook_.AddOrder(bid);
+
+    // Order ids are unique across both sides of the book.
+    EXPECT_DEATH(orderbook_.AddOrder(ask), "");
 }
 
 TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
@@ -1067,6 +1102,42 @@ TEST_F(OrderbookTest, ModifyNonexistentOrder) {
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = BASE_TIMESTAMP};
+    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
+}
+
+TEST_F(OrderbookTest, ModifyOrderToZeroQuantityAsserts) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = 0,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    // A zero-quantity order would linger forever at the head of its level.
+    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
+}
+
+TEST_F(OrderbookTest, ModifyOrderToInvalidQuantityAsserts) {
+    Order order{.order_id = 1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    orderbook_.AddOrder(order);
+
+    Order modified{.order_id = 1,
+                   .price = Invalid<PriceType>,
+                   .quantity = Invalid<QuantityType>,
+                   .side = Side::BID,
+                   .timestamp = NEXT_TIMESTAMP};
+
+    // The Invalid sentinel is not a legal quantity, in the modify path too.
     EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
 }
 

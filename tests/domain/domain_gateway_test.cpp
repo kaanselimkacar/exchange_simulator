@@ -152,6 +152,25 @@ TEST_F(DomainGatewayTest, AddOrderToUnknownOrderbookAsserts) {
     EXPECT_DEATH(gateway_->AddOrder(incoming, UNKNOWN_ORDER_BOOK_ID), "");
 }
 
+TEST_F(DomainGatewayTest, AddDuplicateOrderIdAsserts) {
+    Order first{.order_id = INCOMING_ORDER_1,
+                .price = BASE_PRICE,
+                .quantity = BASE_QUANTITY,
+                .side = Side::BID,
+                .timestamp = BASE_TIMESTAMP};
+    AddOrder(first);
+
+    Order duplicate{.order_id = INCOMING_ORDER_1,
+                    .price = LOWER_PRICE,
+                    .quantity = BASE_QUANTITY,
+                    .side = Side::BID,
+                    .timestamp = NEXT_TIMESTAMP};
+
+    // A duplicate order id while the original still rests on the book must be
+    // rejected before it corrupts the book.
+    EXPECT_DEATH(AddOrder(duplicate), "");
+}
+
 // Incoming bid partially fills the earliest resting ask in place; the ask keeps
 // time priority for the next match.
 TEST_F(DomainGatewayTest, PartialRestingFillKeepsTimePriority) {
