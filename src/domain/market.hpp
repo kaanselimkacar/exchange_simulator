@@ -3,6 +3,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <memory>
 #include <unordered_map>
 
 namespace Domain::Market {
@@ -37,12 +38,20 @@ class PriceLevel {
 };
 
 class Orderbook {
+
   public:
     Orderbook(OrderbookIdType orderbook_id) : orderbook_id_(orderbook_id) {
     }
     auto AddOrder(const Order &order) -> void;
     auto ModifyOrder(const Order &updated_order) -> void;
     auto DeleteOrder(OrderIdType order_id) -> void;
+
+    // TODO: should these take order references for performance reasons?
+    struct TradeExec {
+        OrderIdType ask_id_;
+        OrderIdType bid_id_;
+    };
+    auto ExecuteTrade(TradeExec trade_exec, QuantityType exec_qty) -> void;
 
     [[nodiscard]] auto GetTopOrder(const Side &side) const -> Order;
     [[nodiscard]] auto GetOrderbookId() const -> OrderbookIdType {
@@ -66,4 +75,14 @@ class Orderbook {
     std::unordered_map<OrderIdType, OrderLocation> orders_;
 };
 
+class OrderbookManager {
+  public:
+    auto AddOrderbook(std::unique_ptr<Orderbook> orderbook) -> void;
+
+    [[nodiscard]] auto GetOrderbook(OrderbookIdType orderbook_id)
+        -> const std::unique_ptr<Orderbook> &;
+
+  private:
+    std::unordered_map<OrderbookIdType, std::unique_ptr<Orderbook>> orderbooks_;
+};
 }; // namespace Domain::Market

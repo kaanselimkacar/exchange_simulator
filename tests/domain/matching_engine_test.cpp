@@ -59,8 +59,8 @@ class MatchingEngineTest : public ::testing::Test {
 // ============================================================================
 
 TEST_F(MatchingEngineTest, ReturnNoFillWhenBookEmpty) {
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -69,8 +69,8 @@ TEST_F(MatchingEngineTest, ReturnNoFillWhenBookEmpty) {
 
 TEST_F(MatchingEngineTest, ReturnNoFillWhenBidBelowBestAsk) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -79,8 +79,8 @@ TEST_F(MatchingEngineTest, ReturnNoFillWhenBidBelowBestAsk) {
 
 TEST_F(MatchingEngineTest, ReturnNoFillWhenAskAboveBestBid) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -93,8 +93,8 @@ TEST_F(MatchingEngineTest, ReturnNoFillWhenAskAboveBestBid) {
 
 TEST_F(MatchingEngineTest, FullFillAtSamePrice) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -107,8 +107,8 @@ TEST_F(MatchingEngineTest, FullFillAtSamePrice) {
 
 TEST_F(MatchingEngineTest, CrossAtBetterPriceUsesRestingPrice) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -119,8 +119,8 @@ TEST_F(MatchingEngineTest, CrossAtBetterPriceUsesRestingPrice) {
 
 TEST_F(MatchingEngineTest, PartiallyFillIncomingOrder) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -130,8 +130,8 @@ TEST_F(MatchingEngineTest, PartiallyFillIncomingOrder) {
 TEST_F(MatchingEngineTest, ReturnsOneTradePerCall) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     AddRestingAsk(orderbook_, 2, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -143,8 +143,8 @@ TEST_F(MatchingEngineTest, ReturnsOneTradePerCall) {
 TEST_F(MatchingEngineTest, FillBestPriceFirst) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     AddRestingAsk(orderbook_, 2, HIGHER_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, HIGHER_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -155,8 +155,8 @@ TEST_F(MatchingEngineTest, FillBestPriceFirst) {
 TEST_F(MatchingEngineTest, MatchesEarliestOrderWithinPriceLevel) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, DOUBLE_QUANTITY, BASE_TIMESTAMP);
     AddRestingAsk(orderbook_, 2, BASE_PRICE, BASE_QUANTITY, NEXT_TIMESTAMP);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -167,8 +167,8 @@ TEST_F(MatchingEngineTest, MatchesEarliestOrderWithinPriceLevel) {
 TEST_F(MatchingEngineTest, MatchAgainstHighestBid) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY, BASE_TIMESTAMP);
     AddRestingBid(orderbook_, 2, LOWER_PRICE, BASE_QUANTITY, NEXT_TIMESTAMP);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -180,8 +180,8 @@ TEST_F(MatchingEngineTest, MatchAgainstHighestBid) {
 
 TEST_F(MatchingEngineTest, AskFullFillAtSamePrice) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -194,8 +194,8 @@ TEST_F(MatchingEngineTest, AskFullFillAtSamePrice) {
 
 TEST_F(MatchingEngineTest, AskCrossAtBetterPriceUsesRestingPrice) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -206,8 +206,8 @@ TEST_F(MatchingEngineTest, AskCrossAtBetterPriceUsesRestingPrice) {
 
 TEST_F(MatchingEngineTest, AskPartialFillIncomingOrder) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -217,8 +217,8 @@ TEST_F(MatchingEngineTest, AskPartialFillIncomingOrder) {
 TEST_F(MatchingEngineTest, AskReturnsOneTradePerCall) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     AddRestingBid(orderbook_, 2, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, DOUBLE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -230,8 +230,8 @@ TEST_F(MatchingEngineTest, AskReturnsOneTradePerCall) {
 TEST_F(MatchingEngineTest, AskFillsBestBidFirst) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     AddRestingBid(orderbook_, 2, LOWER_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, LOWER_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -242,8 +242,8 @@ TEST_F(MatchingEngineTest, AskFillsBestBidFirst) {
 TEST_F(MatchingEngineTest, AskMatchesEarliestBidWithinPriceLevel) {
     AddRestingBid(orderbook_, 1, BASE_PRICE, DOUBLE_QUANTITY, BASE_TIMESTAMP);
     AddRestingBid(orderbook_, 2, BASE_PRICE, BASE_QUANTITY, NEXT_TIMESTAMP);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::ASK,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::ASK, BASE_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -253,8 +253,8 @@ TEST_F(MatchingEngineTest, AskMatchesEarliestBidWithinPriceLevel) {
 
 TEST_F(MatchingEngineTest, TradeTimestampMatchesIncoming) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      LATER_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, LATER_TIMESTAMP);
 
     auto trade = engine_.MatchOrders(incoming, orderbook_);
 
@@ -267,8 +267,8 @@ TEST_F(MatchingEngineTest, TradeTimestampMatchesIncoming) {
 
 TEST_F(MatchingEngineTest, MatchOrdersIsDeterministic) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, DOUBLE_QUANTITY);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     auto first = engine_.MatchOrders(incoming, orderbook_);
     auto second = engine_.MatchOrders(incoming, orderbook_);
@@ -283,8 +283,8 @@ TEST_F(MatchingEngineTest, MatchOrdersIsDeterministic) {
 TEST_F(MatchingEngineTest, MatchDoesNotMutateOrderbook) {
     AddRestingAsk(orderbook_, 1, BASE_PRICE, BASE_QUANTITY);
     auto before = orderbook_.GetTopOrder(Side::ASK);
-    auto incoming = MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID,
-                                      BASE_TIMESTAMP);
+    auto incoming =
+        MakeIncomingOrder(INCOMING_ORDER_1, BASE_PRICE, BASE_QUANTITY, Side::BID, BASE_TIMESTAMP);
 
     engine_.MatchOrders(incoming, orderbook_);
 

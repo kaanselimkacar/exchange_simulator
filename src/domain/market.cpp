@@ -101,6 +101,30 @@ auto Orderbook::DeleteOrder(const OrderIdType order_id) -> void {
     orders_.erase(order_iter);
 }
 
+auto Orderbook::ExecuteTrade(TradeExec trade_exec, QuantityType exec_qty) -> void {
+    auto update_qty = [&](OrderIdType order_id, QuantityType exec_qty) -> void {
+        auto iter = orders_.find(order_id);
+        if (iter == orders_.end()) {
+            // TODO: unhappy path
+            assert(0);
+        }
+        auto curr_qty = iter->second.iterator_->quantity;
+        if (curr_qty < exec_qty) {
+            // TODO: unhappy path
+            assert(0);
+        }
+
+        if (curr_qty == exec_qty) {
+            DeleteOrder(order_id);
+        } else {
+            ModifyOrderQuantity(curr_qty - exec_qty, iter->second);
+        }
+    };
+
+    update_qty(trade_exec.ask_id_, exec_qty);
+    update_qty(trade_exec.bid_id_, exec_qty);
+}
+
 auto Orderbook::ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
     -> void {
     auto old_quantity = old_order_location.iterator_->quantity;
@@ -117,6 +141,24 @@ auto Orderbook::GetTopOrder(const Side &side) const -> Order {
         return side_map.begin()->second.GetTopOrder();
     };
     return side == Side::ASK ? get_top_order(asks_) : get_top_order(bids_);
+}
+
+auto OrderbookManager::AddOrderbook(std::unique_ptr<Orderbook> orderbook) -> void {
+    const auto orderbook_id = orderbook->GetOrderbookId();
+    auto result = orderbooks_.try_emplace(orderbook_id, std::move(orderbook));
+    if (!result.second) {
+        assert(0);
+    }
+}
+
+auto OrderbookManager::GetOrderbook(const OrderbookIdType orderbook_id)
+    -> const std::unique_ptr<Orderbook> & {
+    auto iter = orderbooks_.find(orderbook_id);
+    if (iter == orderbooks_.end()) {
+        // TODO: unhappy path
+        assert(0);
+    }
+    return iter->second;
 }
 
 }; // namespace Domain::Market
