@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <expected>
 
 namespace Domain {
 
@@ -34,5 +35,25 @@ struct Trade {
     QuantityType executed_quantity{Invalid<QuantityType>};
     TimestampType timestamp{Invalid<TimestampType>}; // not sure about this
 };
+
+enum class StatusCode : uint8_t {
+    Success,
+    InvalidQty,
+    InvalidSide,
+    InvalidPrice,
+    InvalidOrderId,
+    DuplicateOrderId,
+    DuplicateOrderbookId,
+    InvalidOrderbookId,
+    OrderNotFound,
+    OrderbookNotFound,
+    Internal,
+    Other
+};
+
+template <StatusCode S> [[nodiscard]] consteval auto make_error() noexcept {
+    static_assert(S != StatusCode::Success, "Cannot pass Status::Success to make_error!");
+    return std::unexpected(S);
+}
 
 } // namespace Domain

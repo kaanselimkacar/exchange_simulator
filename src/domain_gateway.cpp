@@ -4,35 +4,60 @@
 namespace Domain {
 
 auto DomainGateway::AddOrder(Order &order, const OrderbookIdType orderbook_id) -> void {
-    const auto &orderbook = orderbook_manager_->GetOrderbook(orderbook_id);
-    orderbook->AddOrder(order);
-    CheckAndExecuteTrade(order, *orderbook);
+    auto orderbook_res = orderbook_manager_->GetOrderbook(orderbook_id);
+    if (!orderbook_res.has_value()) {
+        RejectOrder(order, orderbook_id, orderbook_res.error());
+        return;
+    }
+    auto *orderbook_ptr = orderbook_res.value();
+    auto add_order_res = orderbook_ptr->AddOrder(order);
+    if (add_order_res != StatusCode::Success) {
+        RejectOrder(order, orderbook_id, add_order_res);
+        return;
+    }
+    CheckAndExecuteTrade(order, *orderbook_ptr);
 }
 
 auto DomainGateway::ModifyOrder(Order &updated_order, OrderbookIdType orderbook_id) -> void {
-    const auto &orderbook = orderbook_manager_->GetOrderbook(orderbook_id);
-    orderbook->ModifyOrder(updated_order);
-    CheckAndExecuteTrade(updated_order, *orderbook);
+    auto orderbook_res = orderbook_manager_->GetOrderbook(orderbook_id);
+    if (!orderbook_res.has_value()) {
+        RejectOrder(updated_order, orderbook_id, orderbook_res.error());
+        return;
+    }
+    auto *orderbook_ptr = orderbook_res.value();
+    auto modify_order_res = orderbook_ptr->ModifyOrder(updated_order);
+    if (modify_order_res != StatusCode::Success) {
+        RejectOrder(updated_order, orderbook_id, modify_order_res);
+        return;
+    }
+    CheckAndExecuteTrade(updated_order, *orderbook_ptr);
 }
 
-auto DomainGateway::DeleteOrder(DeleteOrderStruct delete_order) -> void {
-    const auto &orderbook = orderbook_manager_->GetOrderbook(delete_order.orderbook_id);
-    orderbook->DeleteOrder(delete_order.order_id);
+auto DomainGateway::DeleteOrder(Order &order, OrderbookIdType orderbook_id) -> void {
+    auto orderbook_res = orderbook_manager_->GetOrderbook(orderbook_id);
+    if (!orderbook_res.has_value()) {
+        RejectOrder(order, orderbook_id, orderbook_res.error());
+        return;
+    }
+    auto *orderbook_ptr = orderbook_res.value();
+    auto delete_order_res = orderbook_ptr->DeleteOrder(order.order_id);
+    if (delete_order_res != StatusCode::Success) {
+        RejectOrder(order, orderbook_id, delete_order_res);
+        return;
+    }
 }
 
 auto DomainGateway::CheckAndExecuteTrade(Order &order, Market::Orderbook &orderbook) -> void {
 
-    auto trade = matching_engine_->MatchOrders(order, orderbook);
-    while (trade.ask_order_id != Invalid<OrderIdType> && order.quantity > 0) {
-        orderbook.ExecuteTrade({.ask_id_ = trade.ask_order_id, .bid_id_ = trade.bid_order_id},
-                               trade.executed_quantity);
-        // TODO: better assertion needed
-        assert(order.quantity >= trade.executed_quantity);
-
-        order.quantity -= trade.executed_quantity;
-        trade = matching_engine_->MatchOrders(order, orderbook);
-    }
+    [[maybe_unused]] size_t no_trades =
+        matching_engine_->MatchOrders(order, orderbook, std::span{trades_});
     // TODO: missing a lot of stuff here!
 }
+
+// auto DomainGateway::RejectOrder(Order &order, OrderbookIdType orderbook_id, StatusCode
+// status_code)
+//     -> void {
+//     // TODO:
+// }
 
 }; // namespace Domain
