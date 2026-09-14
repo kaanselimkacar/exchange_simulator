@@ -54,10 +54,10 @@ auto DomainGateway::CheckAndExecuteTrade(Order &order, Market::Orderbook &orderb
     // TODO: missing a lot of stuff here!
 }
 
-// auto DomainGateway::RejectOrder(Order &order, OrderbookIdType orderbook_id, StatusCode
-// status_code)
-//     -> void {
-//     // TODO:
-// }
+auto DomainGateway::RejectOrder([[maybe_unused]] Order &order,
+                                [[maybe_unused]] OrderbookIdType orderbook_id,
+                                [[maybe_unused]] StatusCode status_code) -> void {
+    // TODO:
+}
 
 }; // namespace Domain
