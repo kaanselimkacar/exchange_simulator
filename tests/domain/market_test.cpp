@@ -14,7 +14,6 @@ constexpr QuantityType BASE_QUANTITY = 50;
 constexpr QuantityType LARGER_QUANTITY = 75;
 constexpr QuantityType DOUBLE_QUANTITY = 100;
 constexpr QuantityType TRIPLE_QUANTITY = 200;
-constexpr QuantityType THIRTY_QUANTITY = 30;
 constexpr QuantityType FORTY_QUANTITY = 40;
 constexpr QuantityType SIXTY_QUANTITY = 60;
 constexpr TimestampType BASE_TIMESTAMP = 1000;
@@ -87,12 +86,16 @@ TEST_F(PriceLevelTest, AddOrderAccumulatesQuantity) {
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
 
-    price_level_.AddOrder(order1);
-    price_level_.AddOrder(order2);
+    auto iter1 = price_level_.AddOrder(order1);
+    auto iter2 = price_level_.AddOrder(order2);
 
-    // The quantity at the price level should be accumulated
-    // (This tests the internal state is being updated)
-    EXPECT_TRUE(true); // The test passes if no assertion fails in AddOrder
+    EXPECT_NE(iter1, iter2);
+
+    // Both orders must be tracked in the level total: this update only
+    // succeeds if the accumulated quantity reaches TRIPLE_QUANTITY.
+    EXPECT_EQ(price_level_.UpdateQuantity({.modified_order_new_quantity = DOUBLE_QUANTITY,
+                                           .modified_order_old_quantity = TRIPLE_QUANTITY}),
+              StatusCode::Success);
 }
 
 TEST_F(PriceLevelTest, OrdersMaintainFIFOOrder) {
@@ -132,7 +135,7 @@ TEST_F(OrderbookTest, AddBidOrder) {
                     .side = Side::BID,
                     .timestamp = BASE_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid_order));
+    EXPECT_EQ(orderbook_.AddOrder(bid_order), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, AddAskOrder) {
@@ -142,7 +145,7 @@ TEST_F(OrderbookTest, AddAskOrder) {
                     .side = Side::ASK,
                     .timestamp = BASE_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(ask_order));
+    EXPECT_EQ(orderbook_.AddOrder(ask_order), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, AddMultipleBidOrders) {
@@ -158,8 +161,8 @@ TEST_F(OrderbookTest, AddMultipleBidOrders) {
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
+    EXPECT_EQ(orderbook_.AddOrder(bid1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.AddOrder(bid2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, AddMultipleAskOrders) {
@@ -175,8 +178,8 @@ TEST_F(OrderbookTest, AddMultipleAskOrders) {
                .side = Side::ASK,
                .timestamp = NEXT_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(ask1));
-    EXPECT_NO_THROW(orderbook_.AddOrder(ask2));
+    EXPECT_EQ(orderbook_.AddOrder(ask1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.AddOrder(ask2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, AddMixedBidAndAskOrders) {
@@ -198,9 +201,9 @@ TEST_F(OrderbookTest, AddMixedBidAndAskOrders) {
                .side = Side::BID,
                .timestamp = LATER_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
-    EXPECT_NO_THROW(orderbook_.AddOrder(ask1));
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
+    EXPECT_EQ(orderbook_.AddOrder(bid1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.AddOrder(ask1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.AddOrder(bid2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, MultipleOrdersAtSamePrice) {
@@ -216,8 +219,8 @@ TEST_F(OrderbookTest, MultipleOrdersAtSamePrice) {
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid1));
-    EXPECT_NO_THROW(orderbook_.AddOrder(bid2));
+    EXPECT_EQ(orderbook_.AddOrder(bid1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.AddOrder(bid2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroQuantity) {
@@ -227,8 +230,8 @@ TEST_F(OrderbookTest, RejectOrderWithZeroQuantity) {
                         .side = Side::BID,
                         .timestamp = BASE_TIMESTAMP};
 
-    // Should trigger an assertion failure
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    // The orderbook must reject a zero-quantity order with a status code.
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidQty);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithNegativeQuantity) {
@@ -241,7 +244,7 @@ TEST_F(OrderbookTest, RejectOrderWithNegativeQuantity) {
 
     // static_cast<QuantityType>(-1) is UINT64_MAX, the same value as
     // Invalid<QuantityType>; it must be rejected like any other sentinel.
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidQty);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithInvalidSide) {
@@ -251,8 +254,8 @@ TEST_F(OrderbookTest, RejectOrderWithInvalidSide) {
                         .side = Side::INVALID, // Invalid side
                         .timestamp = BASE_TIMESTAMP};
 
-    // Should trigger an assertion failure
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    // The orderbook must reject an invalid side with a status code.
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidSide);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroOrderId) {
@@ -262,8 +265,8 @@ TEST_F(OrderbookTest, RejectOrderWithZeroOrderId) {
                         .side = Side::BID,
                         .timestamp = BASE_TIMESTAMP};
 
-    // Should trigger an assertion failure
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    // The orderbook must reject a zero order id with a status code.
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidOrderId);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithZeroPrice) {
@@ -273,8 +276,8 @@ TEST_F(OrderbookTest, RejectOrderWithZeroPrice) {
                         .side = Side::BID,
                         .timestamp = BASE_TIMESTAMP};
 
-    // Should trigger an assertion failure
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    // The orderbook must reject a zero price with a status code.
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidPrice);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithInvalidOrderId) {
@@ -285,7 +288,7 @@ TEST_F(OrderbookTest, RejectOrderWithInvalidOrderId) {
                         .timestamp = BASE_TIMESTAMP};
 
     // The Invalid sentinel is not a legal order id and must be rejected.
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidOrderId);
 }
 
 TEST_F(OrderbookTest, RejectOrderWithInvalidPrice) {
@@ -296,7 +299,7 @@ TEST_F(OrderbookTest, RejectOrderWithInvalidPrice) {
                         .timestamp = BASE_TIMESTAMP};
 
     // The Invalid sentinel is not a legal price and must be rejected.
-    EXPECT_DEATH(orderbook_.AddOrder(invalid_order), "");
+    EXPECT_EQ(orderbook_.AddOrder(invalid_order), StatusCode::InvalidPrice);
 }
 
 TEST_F(OrderbookTest, LargeQuantityOrder) {
@@ -306,7 +309,7 @@ TEST_F(OrderbookTest, LargeQuantityOrder) {
                       .side = Side::BID,
                       .timestamp = BASE_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(large_order));
+    EXPECT_EQ(orderbook_.AddOrder(large_order), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, LargePriceOrder) {
@@ -316,7 +319,7 @@ TEST_F(OrderbookTest, LargePriceOrder) {
                             .side = Side::BID,
                             .timestamp = BASE_TIMESTAMP};
 
-    EXPECT_NO_THROW(orderbook_.AddOrder(large_price_order));
+    EXPECT_EQ(orderbook_.AddOrder(large_price_order), StatusCode::Success);
 }
 
 // ============================================================================
@@ -333,7 +336,7 @@ TEST_F(PriceLevelTest, IsEmptyAfterAdd) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    price_level_.AddOrder(order);
+    (void)price_level_.AddOrder(order);
     EXPECT_FALSE(price_level_.IsEmpty());
 }
 
@@ -439,8 +442,8 @@ TEST_F(OrderbookTest, DeleteBidOrder) {
               .quantity = BASE_QUANTITY,
               .side = Side::BID,
               .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(bid);
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    (void)orderbook_.AddOrder(bid);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DeleteAskOrder) {
@@ -449,8 +452,8 @@ TEST_F(OrderbookTest, DeleteAskOrder) {
               .quantity = BASE_QUANTITY,
               .side = Side::ASK,
               .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    (void)orderbook_.AddOrder(ask);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DeleteOrderAtSamePriceLevel) {
@@ -464,10 +467,10 @@ TEST_F(OrderbookTest, DeleteOrderAtSamePriceLevel) {
                .quantity = LARGER_QUANTITY,
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid1);
-    orderbook_.AddOrder(bid2);
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    (void)orderbook_.AddOrder(bid1);
+    (void)orderbook_.AddOrder(bid2);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DeleteOrderFromMultiLevel) {
@@ -481,14 +484,14 @@ TEST_F(OrderbookTest, DeleteOrderFromMultiLevel) {
                .quantity = LARGER_QUANTITY,
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid1);
-    orderbook_.AddOrder(bid2);
+    (void)orderbook_.AddOrder(bid1);
+    (void)orderbook_.AddOrder(bid2);
 
     // Delete the order at the higher price level
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 
     // Should still be able to interact with the remaining price level
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DeleteCrossSideOrders) {
@@ -502,14 +505,14 @@ TEST_F(OrderbookTest, DeleteCrossSideOrders) {
               .quantity = BASE_QUANTITY,
               .side = Side::ASK,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid);
-    orderbook_.AddOrder(ask);
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    (void)orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DeleteNonexistentOrder) {
-    EXPECT_DEATH(orderbook_.DeleteOrder(999), "");
+    EXPECT_EQ(orderbook_.DeleteOrder(999), StatusCode::OrderNotFound);
 }
 
 TEST_F(OrderbookTest, DeleteThenReAddSameOrderId) {
@@ -518,8 +521,8 @@ TEST_F(OrderbookTest, DeleteThenReAddSameOrderId) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
-    orderbook_.DeleteOrder(1);
+    (void)orderbook_.AddOrder(order);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 
     // Re-adding the same order_id should succeed
     Order re_add{.order_id = 1,
@@ -527,8 +530,8 @@ TEST_F(OrderbookTest, DeleteThenReAddSameOrderId) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.AddOrder(re_add));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.AddOrder(re_add), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, DuplicateOrderIdRejected) {
@@ -542,11 +545,11 @@ TEST_F(OrderbookTest, DuplicateOrderIdRejected) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(first);
+    (void)orderbook_.AddOrder(first);
 
     // A second live order with the same order_id must be rejected before it
     // can corrupt the price level with an untracked orphan order.
-    EXPECT_DEATH(orderbook_.AddOrder(second), "");
+    EXPECT_EQ(orderbook_.AddOrder(second), StatusCode::DuplicateOrderId);
 }
 
 TEST_F(OrderbookTest, DuplicateOrderIdAcrossSidesRejected) {
@@ -560,10 +563,10 @@ TEST_F(OrderbookTest, DuplicateOrderIdAcrossSidesRejected) {
               .quantity = LARGER_QUANTITY,
               .side = Side::ASK,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(bid);
 
     // Order ids are unique across both sides of the book.
-    EXPECT_DEATH(orderbook_.AddOrder(ask), "");
+    EXPECT_EQ(orderbook_.AddOrder(ask), StatusCode::DuplicateOrderId);
 }
 
 TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
@@ -577,11 +580,11 @@ TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
                .quantity = BASE_QUANTITY,
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid1);
-    orderbook_.AddOrder(bid2);
+    (void)orderbook_.AddOrder(bid1);
+    (void)orderbook_.AddOrder(bid2);
 
     // Delete the first order — price level still has bid2, so it should persist
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 
     // Add another order at a fresh price level, then delete the remaining order
     Order bid3{.order_id = 3,
@@ -589,9 +592,9 @@ TEST_F(OrderbookTest, DeleteOrderAfterAddingToNewPriceLevel) {
                .quantity = BASE_QUANTITY,
                .side = Side::BID,
                .timestamp = LATER_TIMESTAMP};
-    orderbook_.AddOrder(bid3);
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(3));
+    (void)orderbook_.AddOrder(bid3);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(3), StatusCode::Success);
 }
 
 // ============================================================================
@@ -609,11 +612,12 @@ TEST_F(PriceLevelTest, UpdateQuantityIncrease) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    price_level_.AddOrder(order1);
-    price_level_.AddOrder(order2);
+    (void)price_level_.AddOrder(order1);
+    (void)price_level_.AddOrder(order2);
 
-    EXPECT_NO_THROW(price_level_.UpdateQuantity(
-        {.new_quantity = DOUBLE_QUANTITY, .old_quantity = BASE_QUANTITY}));
+    EXPECT_EQ(price_level_.UpdateQuantity({.modified_order_new_quantity = DOUBLE_QUANTITY,
+                                           .modified_order_old_quantity = BASE_QUANTITY}),
+              StatusCode::Success);
 }
 
 TEST_F(PriceLevelTest, UpdateQuantityDecrease) {
@@ -627,11 +631,12 @@ TEST_F(PriceLevelTest, UpdateQuantityDecrease) {
                  .quantity = BASE_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    price_level_.AddOrder(order1);
-    price_level_.AddOrder(order2);
+    (void)price_level_.AddOrder(order1);
+    (void)price_level_.AddOrder(order2);
 
-    EXPECT_NO_THROW(price_level_.UpdateQuantity(
-        {.new_quantity = BASE_QUANTITY, .old_quantity = TRIPLE_QUANTITY}));
+    EXPECT_EQ(price_level_.UpdateQuantity({.modified_order_new_quantity = BASE_QUANTITY,
+                                           .modified_order_old_quantity = TRIPLE_QUANTITY}),
+              StatusCode::Success);
 }
 
 TEST_F(PriceLevelTest, UpdateQuantityNoChange) {
@@ -640,10 +645,26 @@ TEST_F(PriceLevelTest, UpdateQuantityNoChange) {
                  .quantity = BASE_QUANTITY,
                  .side = Side::BID,
                  .timestamp = BASE_TIMESTAMP};
-    price_level_.AddOrder(order1);
+    (void)price_level_.AddOrder(order1);
 
-    EXPECT_NO_THROW(price_level_.UpdateQuantity(
-        {.new_quantity = BASE_QUANTITY, .old_quantity = BASE_QUANTITY}));
+    EXPECT_EQ(price_level_.UpdateQuantity({.modified_order_new_quantity = BASE_QUANTITY,
+                                           .modified_order_old_quantity = BASE_QUANTITY}),
+              StatusCode::Success);
+}
+
+TEST_F(PriceLevelTest, UpdateQuantityRejectsWhenOldQuantityExceedsLevelTotal) {
+    Order order1{.order_id = 1,
+                 .price = BASE_PRICE,
+                 .quantity = BASE_QUANTITY,
+                 .side = Side::BID,
+                 .timestamp = BASE_TIMESTAMP};
+    (void)price_level_.AddOrder(order1);
+
+    // old_quantity larger than the whole level would drive the total negative;
+    // the update must be rejected and leave the level untouched.
+    EXPECT_EQ(price_level_.UpdateQuantity({.modified_order_new_quantity = BASE_QUANTITY,
+                                           .modified_order_old_quantity = LARGER_QUANTITY}),
+              StatusCode::InvalidQty);
 }
 
 // ============================================================================
@@ -656,15 +677,15 @@ TEST_F(OrderbookTest, ModifyBidQuantityIncrease) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyBidQuantityDecrease) {
@@ -673,15 +694,15 @@ TEST_F(OrderbookTest, ModifyBidQuantityDecrease) {
                 .quantity = DOUBLE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyAskQuantityIncrease) {
@@ -690,15 +711,15 @@ TEST_F(OrderbookTest, ModifyAskQuantityIncrease) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::ASK,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::ASK,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyAskQuantityDecrease) {
@@ -707,15 +728,15 @@ TEST_F(OrderbookTest, ModifyAskQuantityDecrease) {
                 .quantity = DOUBLE_QUANTITY,
                 .side = Side::ASK,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = BASE_QUANTITY,
                    .side = Side::ASK,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderSamePriceExplicitly) {
@@ -724,15 +745,15 @@ TEST_F(OrderbookTest, ModifyOrderSamePriceExplicitly) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = BASE_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderSameQuantityNoChange) {
@@ -741,15 +762,15 @@ TEST_F(OrderbookTest, ModifyOrderSameQuantityNoChange) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderMultipleTimes) {
@@ -758,21 +779,21 @@ TEST_F(OrderbookTest, ModifyOrderMultipleTimes) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order mod1{.order_id = 1,
                .price = Invalid<PriceType>,
                .quantity = DOUBLE_QUANTITY,
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod1));
+    EXPECT_EQ(orderbook_.ModifyOrder(mod1), StatusCode::Success);
 
     Order mod2{.order_id = 1,
                .price = Invalid<PriceType>,
                .quantity = TRIPLE_QUANTITY,
                .side = Side::BID,
                .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod2));
+    EXPECT_EQ(orderbook_.ModifyOrder(mod2), StatusCode::Success);
 
     // Modify with explicit same price after sentinel modifies
     Order mod3{.order_id = 1,
@@ -780,9 +801,9 @@ TEST_F(OrderbookTest, ModifyOrderMultipleTimes) {
                .quantity = DOUBLE_QUANTITY,
                .side = Side::BID,
                .timestamp = BASE_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(mod3));
+    EXPECT_EQ(orderbook_.ModifyOrder(mod3), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderThenDeleteSameOrder) {
@@ -791,15 +812,15 @@ TEST_F(OrderbookTest, ModifyOrderThenDeleteSameOrder) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 // ============================================================================
@@ -812,15 +833,15 @@ TEST_F(OrderbookTest, ModifyBidPriceChangeToHigher) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = HIGHER_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyBidPriceChangeToLower) {
@@ -829,15 +850,15 @@ TEST_F(OrderbookTest, ModifyBidPriceChangeToLower) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = BASE_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyAskPriceChangeToHigher) {
@@ -846,15 +867,15 @@ TEST_F(OrderbookTest, ModifyAskPriceChangeToHigher) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::ASK,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = MUCH_HIGHER_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::ASK,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyAskPriceChangeToLower) {
@@ -863,15 +884,15 @@ TEST_F(OrderbookTest, ModifyAskPriceChangeToLower) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::ASK,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = HIGHER_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::ASK,
                    .timestamp = NEXT_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 // ============================================================================
@@ -889,18 +910,18 @@ TEST_F(OrderbookTest, ModifyOrderPreservesOtherOrdersAtSamePriceLevel) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderToNewPriceLevel) {
@@ -914,18 +935,18 @@ TEST_F(OrderbookTest, ModifyOrderToNewPriceLevel) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
 
     Order modified{.order_id = 2,
                    .price = HIGHER_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderToExistingPriceLevel) {
@@ -939,18 +960,18 @@ TEST_F(OrderbookTest, ModifyOrderToExistingPriceLevel) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
 
     Order modified{.order_id = 2,
                    .price = BASE_PRICE,
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderFromPriceLevelWithMultipleOrders) {
@@ -969,9 +990,9 @@ TEST_F(OrderbookTest, ModifyOrderFromPriceLevelWithMultipleOrders) {
                  .quantity = DOUBLE_QUANTITY,
                  .side = Side::BID,
                  .timestamp = LATER_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
-    orderbook_.AddOrder(order3);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order3);
 
     // Move order2 away — BASE_PRICE level still has order1 and order3
     Order modified{.order_id = 2,
@@ -979,11 +1000,11 @@ TEST_F(OrderbookTest, ModifyOrderFromPriceLevelWithMultipleOrders) {
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = BASE_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(3));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(3), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyOrderToPriceLevelThatEmptiesSourceLevel) {
@@ -997,8 +1018,8 @@ TEST_F(OrderbookTest, ModifyOrderToPriceLevelThatEmptiesSourceLevel) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
 
     // Move the only order at HIGHER_PRICE to BASE_PRICE — HIGHER_PRICE level empties
     Order modified{.order_id = 2,
@@ -1006,10 +1027,10 @@ TEST_F(OrderbookTest, ModifyOrderToPriceLevelThatEmptiesSourceLevel) {
                    .quantity = LARGER_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyCrossSideOrdersWithPriceChange) {
@@ -1023,18 +1044,18 @@ TEST_F(OrderbookTest, ModifyCrossSideOrdersWithPriceChange) {
               .quantity = LARGER_QUANTITY,
               .side = Side::ASK,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid);
-    orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
 
     Order modified{.order_id = 2,
                    .price = MUCH_HIGHER_PRICE,
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::ASK,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 TEST_F(OrderbookTest, ModifyBidCrossesAskSide) {
@@ -1048,8 +1069,8 @@ TEST_F(OrderbookTest, ModifyBidCrossesAskSide) {
               .quantity = LARGER_QUANTITY,
               .side = Side::ASK,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid);
-    orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
 
     // Move bid above ask — the orderbook allows crosses; matching engine handles them later
     Order modified{.order_id = 1,
@@ -1057,10 +1078,10 @@ TEST_F(OrderbookTest, ModifyBidCrossesAskSide) {
                    .quantity = DOUBLE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    EXPECT_NO_THROW(orderbook_.ModifyOrder(modified));
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::Success);
 
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(1));
-    EXPECT_NO_THROW(orderbook_.DeleteOrder(2));
+    EXPECT_EQ(orderbook_.DeleteOrder(1), StatusCode::Success);
+    EXPECT_EQ(orderbook_.DeleteOrder(2), StatusCode::Success);
 }
 
 // SKIPPED: pins time priority across a price change. ModifyOrder to a new price
@@ -1079,17 +1100,17 @@ TEST_F(OrderbookTest, DISABLED_ModifyOrderPriceChangeKeepsEarliestTimestampPrior
                  .quantity = BASE_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(order1);
-    orderbook_.AddOrder(order2);
+    (void)orderbook_.AddOrder(order1);
+    (void)orderbook_.AddOrder(order2);
 
     Order modified{.order_id = 1,
                    .price = MUCH_HIGHER_PRICE,
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = BASE_TIMESTAMP};
-    orderbook_.ModifyOrder(modified);
+    (void)orderbook_.ModifyOrder(modified);
 
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 1);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).value().order_id, 1);
 }
 
 // ============================================================================
@@ -1102,7 +1123,7 @@ TEST_F(OrderbookTest, ModifyNonexistentOrder) {
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = BASE_TIMESTAMP};
-    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::OrderNotFound);
 }
 
 TEST_F(OrderbookTest, ModifyOrderToZeroQuantityAsserts) {
@@ -1111,7 +1132,7 @@ TEST_F(OrderbookTest, ModifyOrderToZeroQuantityAsserts) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
@@ -1120,7 +1141,7 @@ TEST_F(OrderbookTest, ModifyOrderToZeroQuantityAsserts) {
                    .timestamp = NEXT_TIMESTAMP};
 
     // A zero-quantity order would linger forever at the head of its level.
-    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::InvalidQty);
 }
 
 TEST_F(OrderbookTest, ModifyOrderToInvalidQuantityAsserts) {
@@ -1129,7 +1150,7 @@ TEST_F(OrderbookTest, ModifyOrderToInvalidQuantityAsserts) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(order);
+    (void)orderbook_.AddOrder(order);
 
     Order modified{.order_id = 1,
                    .price = Invalid<PriceType>,
@@ -1138,18 +1159,16 @@ TEST_F(OrderbookTest, ModifyOrderToInvalidQuantityAsserts) {
                    .timestamp = NEXT_TIMESTAMP};
 
     // The Invalid sentinel is not a legal quantity, in the modify path too.
-    EXPECT_DEATH(orderbook_.ModifyOrder(modified), "");
+    EXPECT_EQ(orderbook_.ModifyOrder(modified), StatusCode::InvalidQty);
 }
 
 // ============================================================================
 // PriceLevel GetTopOrder Tests
 // ============================================================================
 
-TEST_F(PriceLevelTest, GetTopOrderOnEmptyLevelReturnsDefaultOrder) {
-    auto top = price_level_.GetTopOrder();
-    EXPECT_EQ(top.order_id, Invalid<OrderIdType>);
-    EXPECT_EQ(top.side, Side::INVALID);
-}
+// PriceLevel::GetTopOrder is documented as only callable on a non-empty
+// level (it triggers std::unreachable() otherwise), so there is no "empty
+// level returns default order" contract to pin anymore.
 
 TEST_F(PriceLevelTest, GetTopOrderReturnsFirstInsertedOrder) {
     Order first{.order_id = 1,
@@ -1162,8 +1181,8 @@ TEST_F(PriceLevelTest, GetTopOrderReturnsFirstInsertedOrder) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
-    price_level_.AddOrder(first);
-    price_level_.AddOrder(second);
+    (void)price_level_.AddOrder(first);
+    (void)price_level_.AddOrder(second);
 
     auto top = price_level_.GetTopOrder();
     EXPECT_EQ(top.order_id, 1);
@@ -1177,7 +1196,7 @@ TEST_F(PriceLevelTest, GetTopOrderIsNonMutating) {
                 .quantity = BASE_QUANTITY,
                 .side = Side::BID,
                 .timestamp = BASE_TIMESTAMP};
-    price_level_.AddOrder(order);
+    (void)price_level_.AddOrder(order);
 
     auto top_first = price_level_.GetTopOrder();
     auto top_second = price_level_.GetTopOrder();
@@ -1198,7 +1217,7 @@ TEST_F(PriceLevelTest, GetTopOrderFollowsQueueAfterDelete) {
                  .side = Side::BID,
                  .timestamp = NEXT_TIMESTAMP};
     auto first_iter = price_level_.AddOrder(first);
-    price_level_.AddOrder(second);
+    (void)price_level_.AddOrder(second);
 
     price_level_.DeleteOrder(first_iter);
     auto top = price_level_.GetTopOrder();
@@ -1218,8 +1237,8 @@ TEST_F(PriceLevelTest, GetTopOrderReturnsHeadByArrivalNotTimestamp) {
                  .quantity = LARGER_QUANTITY,
                  .side = Side::BID,
                  .timestamp = BASE_TIMESTAMP};
-    price_level_.AddOrder(first);
-    price_level_.AddOrder(second);
+    (void)price_level_.AddOrder(first);
+    (void)price_level_.AddOrder(second);
 
     auto top = price_level_.GetTopOrder();
     EXPECT_EQ(top.order_id, 1);
@@ -1229,11 +1248,9 @@ TEST_F(PriceLevelTest, GetTopOrderReturnsHeadByArrivalNotTimestamp) {
 // Orderbook GetTopOrder Tests
 // ============================================================================
 
-TEST_F(OrderbookTest, GetTopOrderOnEmptyBookReturnsDefaultForBothSides) {
-    auto top_bid = orderbook_.GetTopOrder(Side::BID);
-    auto top_ask = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top_bid.order_id, Invalid<OrderIdType>);
-    EXPECT_EQ(top_ask.order_id, Invalid<OrderIdType>);
+TEST_F(OrderbookTest, GetTopOrderOnEmptyBookReturnsNoValueForBothSides) {
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::BID).has_value());
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::ASK).has_value());
 }
 
 TEST_F(OrderbookTest, BestBidIsHighestPrice) {
@@ -1247,12 +1264,12 @@ TEST_F(OrderbookTest, BestBidIsHighestPrice) {
                      .quantity = LARGER_QUANTITY,
                      .side = Side::BID,
                      .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(lower_bid);
-    orderbook_.AddOrder(higher_bid);
+    (void)orderbook_.AddOrder(lower_bid);
+    (void)orderbook_.AddOrder(higher_bid);
 
     auto top = orderbook_.GetTopOrder(Side::BID);
-    EXPECT_EQ(top.order_id, 2);
-    EXPECT_EQ(top.price, BASE_PRICE);
+    EXPECT_EQ(top.value().order_id, 2);
+    EXPECT_EQ(top.value().price, BASE_PRICE);
 }
 
 TEST_F(OrderbookTest, BestAskIsLowestPrice) {
@@ -1266,12 +1283,12 @@ TEST_F(OrderbookTest, BestAskIsLowestPrice) {
                     .quantity = LARGER_QUANTITY,
                     .side = Side::ASK,
                     .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(higher_ask);
-    orderbook_.AddOrder(lower_ask);
+    (void)orderbook_.AddOrder(higher_ask);
+    (void)orderbook_.AddOrder(lower_ask);
 
     auto top = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top.order_id, 2);
-    EXPECT_EQ(top.price, HIGHER_PRICE);
+    EXPECT_EQ(top.value().order_id, 2);
+    EXPECT_EQ(top.value().price, HIGHER_PRICE);
 }
 
 TEST_F(OrderbookTest, GetTopOrderIsSideIsolated) {
@@ -1286,13 +1303,13 @@ TEST_F(OrderbookTest, GetTopOrderIsSideIsolated) {
                        .quantity = LARGER_QUANTITY,
                        .side = Side::ASK,
                        .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid);
-    orderbook_.AddOrder(crossing_ask);
+    (void)orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(crossing_ask);
 
     auto top_bid = orderbook_.GetTopOrder(Side::BID);
     auto top_ask = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top_bid.order_id, 1);
-    EXPECT_EQ(top_ask.order_id, 2);
+    EXPECT_EQ(top_bid.value().order_id, 1);
+    EXPECT_EQ(top_ask.value().order_id, 2);
 }
 
 TEST_F(OrderbookTest, SamePriceLevelReturnsSeniorOrder) {
@@ -1306,11 +1323,11 @@ TEST_F(OrderbookTest, SamePriceLevelReturnsSeniorOrder) {
                      .quantity = LARGER_QUANTITY,
                      .side = Side::ASK,
                      .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask_first);
-    orderbook_.AddOrder(ask_second);
+    (void)orderbook_.AddOrder(ask_first);
+    (void)orderbook_.AddOrder(ask_second);
 
     auto top = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top.order_id, 1);
+    EXPECT_EQ(top.value().order_id, 1);
 }
 
 TEST_F(OrderbookTest, GetTopOrderTracksModifyAndDelete) {
@@ -1324,9 +1341,9 @@ TEST_F(OrderbookTest, GetTopOrderTracksModifyAndDelete) {
                .quantity = LARGER_QUANTITY,
                .side = Side::BID,
                .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(bid1);
-    orderbook_.AddOrder(bid2);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 1);
+    (void)orderbook_.AddOrder(bid1);
+    (void)orderbook_.AddOrder(bid2);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).value().order_id, 1);
 
     // Move bid1 down to bid2's level: bid2 is senior there and becomes best bid.
     Order modified{.order_id = 1,
@@ -1334,14 +1351,14 @@ TEST_F(OrderbookTest, GetTopOrderTracksModifyAndDelete) {
                    .quantity = BASE_QUANTITY,
                    .side = Side::BID,
                    .timestamp = LATER_TIMESTAMP};
-    orderbook_.ModifyOrder(modified);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 2);
+    (void)orderbook_.ModifyOrder(modified);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).value().order_id, 2);
 
-    orderbook_.DeleteOrder(2);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, 1);
+    (void)orderbook_.DeleteOrder(2);
+    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).value().order_id, 1);
 
-    orderbook_.DeleteOrder(1);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+    (void)orderbook_.DeleteOrder(1);
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::BID).has_value());
 }
 
 // ============================================================================
@@ -1359,17 +1376,18 @@ TEST_F(OrderbookTest, ExecuteTradePartialFillReducesBothOrdersInPlace) {
               .quantity = DOUBLE_QUANTITY,
               .side = Side::BID,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
 
-    orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 2}, FORTY_QUANTITY);
+    EXPECT_EQ(orderbook_.ExecuteTrade({.ask_id = 1, .bid_id = 2}, FORTY_QUANTITY),
+              StatusCode::Success);
 
     auto top_ask = orderbook_.GetTopOrder(Side::ASK);
     auto top_bid = orderbook_.GetTopOrder(Side::BID);
-    EXPECT_EQ(top_ask.order_id, 1);
-    EXPECT_EQ(top_ask.quantity, SIXTY_QUANTITY);
-    EXPECT_EQ(top_bid.order_id, 2);
-    EXPECT_EQ(top_bid.quantity, SIXTY_QUANTITY);
+    EXPECT_EQ(top_ask.value().order_id, 1);
+    EXPECT_EQ(top_ask.value().quantity, SIXTY_QUANTITY);
+    EXPECT_EQ(top_bid.value().order_id, 2);
+    EXPECT_EQ(top_bid.value().quantity, SIXTY_QUANTITY);
 }
 
 TEST_F(OrderbookTest, ExecuteTradeFullFillDeletesBothOrders) {
@@ -1383,13 +1401,14 @@ TEST_F(OrderbookTest, ExecuteTradeFullFillDeletesBothOrders) {
               .quantity = BASE_QUANTITY,
               .side = Side::BID,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
 
-    orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 2}, BASE_QUANTITY);
+    EXPECT_EQ(orderbook_.ExecuteTrade({.ask_id = 1, .bid_id = 2}, BASE_QUANTITY),
+              StatusCode::Success);
 
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::ASK).has_value());
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::BID).has_value());
 }
 
 TEST_F(OrderbookTest, ExecuteTradeFullyConsumesAskLeavesPartialBid) {
@@ -1403,15 +1422,16 @@ TEST_F(OrderbookTest, ExecuteTradeFullyConsumesAskLeavesPartialBid) {
               .quantity = DOUBLE_QUANTITY,
               .side = Side::BID,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
 
-    orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 2}, BASE_QUANTITY);
+    EXPECT_EQ(orderbook_.ExecuteTrade({.ask_id = 1, .bid_id = 2}, BASE_QUANTITY),
+              StatusCode::Success);
 
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::ASK).order_id, Invalid<OrderIdType>);
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::ASK).has_value());
     auto top_bid = orderbook_.GetTopOrder(Side::BID);
-    EXPECT_EQ(top_bid.order_id, 2);
-    EXPECT_EQ(top_bid.quantity, BASE_QUANTITY);
+    EXPECT_EQ(top_bid.value().order_id, 2);
+    EXPECT_EQ(top_bid.value().quantity, BASE_QUANTITY);
 }
 
 TEST_F(OrderbookTest, ExecuteTradeFullyConsumesBidLeavesPartialAsk) {
@@ -1425,15 +1445,16 @@ TEST_F(OrderbookTest, ExecuteTradeFullyConsumesBidLeavesPartialAsk) {
               .quantity = BASE_QUANTITY,
               .side = Side::BID,
               .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask);
+    (void)orderbook_.AddOrder(bid);
 
-    orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 2}, BASE_QUANTITY);
+    EXPECT_EQ(orderbook_.ExecuteTrade({.ask_id = 1, .bid_id = 2}, BASE_QUANTITY),
+              StatusCode::Success);
 
     auto top_ask = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top_ask.order_id, 1);
-    EXPECT_EQ(top_ask.quantity, BASE_QUANTITY);
-    EXPECT_EQ(orderbook_.GetTopOrder(Side::BID).order_id, Invalid<OrderIdType>);
+    EXPECT_EQ(top_ask.value().order_id, 1);
+    EXPECT_EQ(top_ask.value().quantity, BASE_QUANTITY);
+    EXPECT_FALSE(orderbook_.GetTopOrder(Side::BID).has_value());
 }
 
 TEST_F(OrderbookTest, ExecuteTradePartialFillPreservesTimePriorityAtLevel) {
@@ -1452,52 +1473,22 @@ TEST_F(OrderbookTest, ExecuteTradePartialFillPreservesTimePriorityAtLevel) {
               .quantity = DOUBLE_QUANTITY,
               .side = Side::BID,
               .timestamp = BASE_TIMESTAMP};
-    orderbook_.AddOrder(ask_first);
-    orderbook_.AddOrder(ask_second);
-    orderbook_.AddOrder(bid);
+    (void)orderbook_.AddOrder(ask_first);
+    (void)orderbook_.AddOrder(ask_second);
+    (void)orderbook_.AddOrder(bid);
 
-    orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 3}, FORTY_QUANTITY);
+    EXPECT_EQ(orderbook_.ExecuteTrade({.ask_id = 1, .bid_id = 3}, FORTY_QUANTITY),
+              StatusCode::Success);
 
     auto top_ask = orderbook_.GetTopOrder(Side::ASK);
-    EXPECT_EQ(top_ask.order_id, 1);
-    EXPECT_EQ(top_ask.quantity, SIXTY_QUANTITY);
+    EXPECT_EQ(top_ask.value().order_id, 1);
+    EXPECT_EQ(top_ask.value().quantity, SIXTY_QUANTITY);
 }
 
-TEST_F(OrderbookTest, ExecuteTradeUnknownOrderIdAsserts) {
-    Order ask{.order_id = 1,
-              .price = BASE_PRICE,
-              .quantity = BASE_QUANTITY,
-              .side = Side::ASK,
-              .timestamp = BASE_TIMESTAMP};
-    Order bid{.order_id = 2,
-              .price = BASE_PRICE,
-              .quantity = BASE_QUANTITY,
-              .side = Side::BID,
-              .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
-
-    EXPECT_DEATH(
-        orderbook_.ExecuteTrade({.ask_id_ = NONEXISTENT_ORDER_ID, .bid_id_ = 2}, BASE_QUANTITY),
-        "");
-}
-
-TEST_F(OrderbookTest, ExecuteTradeExecQuantityAboveRestingAsserts) {
-    Order ask{.order_id = 1,
-              .price = BASE_PRICE,
-              .quantity = THIRTY_QUANTITY,
-              .side = Side::ASK,
-              .timestamp = BASE_TIMESTAMP};
-    Order bid{.order_id = 2,
-              .price = BASE_PRICE,
-              .quantity = DOUBLE_QUANTITY,
-              .side = Side::BID,
-              .timestamp = NEXT_TIMESTAMP};
-    orderbook_.AddOrder(ask);
-    orderbook_.AddOrder(bid);
-
-    EXPECT_DEATH(orderbook_.ExecuteTrade({.ask_id_ = 1, .bid_id_ = 2}, FORTY_QUANTITY), "");
-}
+// ExecuteTrade's failures on unknown ids / exec quantity above resting are
+// intentional-unreachable paths in market.cpp (std::unreachable()), which compiles
+// to UB rather than a reliably observable abort. They are not pinned here until the
+// domain contract returns a defined StatusCode on those paths.
 
 // ============================================================================
 // OrderbookManager Tests
@@ -1509,58 +1500,80 @@ class OrderbookManagerTest : public ::testing::Test {
 };
 
 TEST_F(OrderbookManagerTest, AddAndGetSingleOrderbook) {
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID));
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::Success);
 
-    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID)->GetOrderbookId(), ORDERBOOK_ID);
+    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID).value()->GetOrderbookId(),
+              ORDERBOOK_ID);
 }
 
 TEST_F(OrderbookManagerTest, AddAndGetMultipleOrderbooks) {
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID));
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(SECOND_ORDERBOOK_ID));
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::Success);
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(SECOND_ORDERBOOK_ID)),
+              StatusCode::Success);
 
-    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID)->GetOrderbookId(), ORDERBOOK_ID);
-    EXPECT_EQ(orderbook_manager_.GetOrderbook(SECOND_ORDERBOOK_ID)->GetOrderbookId(),
+    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID).value()->GetOrderbookId(),
+              ORDERBOOK_ID);
+    EXPECT_EQ(orderbook_manager_.GetOrderbook(SECOND_ORDERBOOK_ID).value()->GetOrderbookId(),
               SECOND_ORDERBOOK_ID);
 }
 
 TEST_F(OrderbookManagerTest, GetReturnsSameInstanceAcrossCalls) {
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID));
-    const auto &first_handle = orderbook_manager_.GetOrderbook(ORDERBOOK_ID);
-    const auto &second_handle = orderbook_manager_.GetOrderbook(ORDERBOOK_ID);
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::Success);
+    auto first_res = orderbook_manager_.GetOrderbook(ORDERBOOK_ID);
+    auto second_res = orderbook_manager_.GetOrderbook(ORDERBOOK_ID);
+    EXPECT_TRUE(first_res.has_value());
+    EXPECT_TRUE(second_res.has_value());
 
-    first_handle->AddOrder(Order{.order_id = 1,
-                                 .price = BASE_PRICE,
-                                 .quantity = BASE_QUANTITY,
-                                 .side = Side::BID,
-                                 .timestamp = BASE_TIMESTAMP});
+    (void)first_res.value()->AddOrder(Order{.order_id = 1,
+                                            .price = BASE_PRICE,
+                                            .quantity = BASE_QUANTITY,
+                                            .side = Side::BID,
+                                            .timestamp = BASE_TIMESTAMP});
 
-    EXPECT_EQ(second_handle->GetTopOrder(Side::BID).order_id, 1);
+    EXPECT_EQ(second_res.value()->GetTopOrder(Side::BID).value().order_id, 1);
 }
 
-TEST_F(OrderbookManagerTest, DuplicateOrderbookIdAsserts) {
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID));
+TEST_F(OrderbookManagerTest, DuplicateOrderbookIdRejected) {
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::Success);
 
-    EXPECT_DEATH(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)), "");
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::DuplicateOrderbookId);
 }
 
-TEST_F(OrderbookManagerTest, GetUnknownOrderbookIdAsserts) {
-    EXPECT_DEATH((void)orderbook_manager_.GetOrderbook(UNKNOWN_ORDERBOOK_ID), "");
+TEST_F(OrderbookManagerTest, GetUnknownOrderbookIdReturnsOrderbookNotFound) {
+    auto res = orderbook_manager_.GetOrderbook(UNKNOWN_ORDERBOOK_ID);
+    EXPECT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), StatusCode::OrderbookNotFound);
 }
 
 TEST_F(OrderbookManagerTest, OrderbooksAreIsolated) {
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID));
-    orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(SECOND_ORDERBOOK_ID));
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(ORDERBOOK_ID)),
+              StatusCode::Success);
+    EXPECT_EQ(orderbook_manager_.AddOrderbook(std::make_unique<Orderbook>(SECOND_ORDERBOOK_ID)),
+              StatusCode::Success);
 
-    orderbook_manager_.GetOrderbook(ORDERBOOK_ID)
+    (void)orderbook_manager_.GetOrderbook(ORDERBOOK_ID)
+        .value()
         ->AddOrder(Order{.order_id = 1,
                          .price = BASE_PRICE,
                          .quantity = BASE_QUANTITY,
                          .side = Side::BID,
                          .timestamp = BASE_TIMESTAMP});
 
-    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID)->GetTopOrder(Side::BID).order_id, 1);
-    EXPECT_EQ(orderbook_manager_.GetOrderbook(SECOND_ORDERBOOK_ID)->GetTopOrder(Side::BID).order_id,
-              Invalid<OrderIdType>);
+    EXPECT_EQ(orderbook_manager_.GetOrderbook(ORDERBOOK_ID)
+                  .value()
+                  ->GetTopOrder(Side::BID)
+                  .value()
+                  .order_id,
+              1);
+    EXPECT_FALSE(orderbook_manager_.GetOrderbook(SECOND_ORDERBOOK_ID)
+                     .value()
+                     ->GetTopOrder(Side::BID)
+                     .has_value());
 }
 
 } // namespace Domain::Market::Testing

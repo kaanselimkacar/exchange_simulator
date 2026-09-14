@@ -1,13 +1,16 @@
 #pragma once
 #include "market.hpp"
+#include <span>
 
 namespace Domain::MatchingEngine {
 
-// methods of this class may very well be static methods
+// TODO: methods of this class may very well be static methods
 class MatchingEngine {
   public:
-    auto MatchOrders(const Order &incoming_order, const Market::Orderbook &orderbook)
-        -> Domain::Trade;
+    // currently requires incoming_order added to orderbook before matching
+    [[nodiscard]] auto MatchOrders(Order &incoming_order, Market::Orderbook &orderbook,
+                                   std::span<Trade> out_trades) -> size_t;
+    static constexpr size_t MAX_TRADES = 1024;
 
   private:
     struct TradeOrders {

@@ -13,21 +13,23 @@ using OrderListIterator = std::list<Order>::iterator;
 
 class PriceLevel {
   public:
-    PriceLevel(PriceType price) : price_(price) {
+    PriceLevel(PriceType price) noexcept : price_(price) {
     }
 
     struct QuantityChange {
-        QuantityType new_quantity;
-        QuantityType old_quantity;
+        QuantityType modified_order_new_quantity;
+        QuantityType modified_order_old_quantity;
     };
 
-    auto AddOrder(const Order &order) -> OrderListIterator;
-    auto UpdateQuantity(const QuantityChange &qty_change) -> void;
-    [[nodiscard]] auto IsEmpty() const -> bool;
+    // TODO: wrap the orderlist and orderlist iterators
+    [[nodiscard]] auto AddOrder(const Order &order) -> OrderListIterator;
+    [[nodiscard]] auto UpdateQuantity(const QuantityChange &qty_change) noexcept -> StatusCode;
+    [[nodiscard]] auto IsEmpty() const noexcept -> bool;
     auto DeleteOrder(OrderListIterator order_list_iterator) -> void;
 
-    [[nodiscard]] auto GetTopOrder() const -> Order;
-    [[nodiscard]] auto GetPrice() const -> PriceType {
+    // TODO: this shouldn't return a copy !!!!!!!!
+    [[nodiscard]] auto GetTopOrder() const noexcept -> Order;
+    [[nodiscard]] auto GetPrice() const noexcept -> PriceType {
         return price_;
     };
 
@@ -39,20 +41,20 @@ class PriceLevel {
 
 class Orderbook {
   public:
-    Orderbook(OrderbookIdType orderbook_id) : orderbook_id_(orderbook_id) {
+    Orderbook(OrderbookIdType orderbook_id) noexcept : orderbook_id_(orderbook_id) {
     }
-    auto AddOrder(const Order &order) -> void;
-    auto ModifyOrder(const Order &updated_order) -> void;
-    auto DeleteOrder(OrderIdType order_id) -> void;
+    [[nodiscard]] auto AddOrder(const Order &order) -> StatusCode;
+    [[nodiscard]] auto ModifyOrder(const Order &updated_order) -> StatusCode;
+    [[nodiscard]] auto DeleteOrder(OrderIdType order_id) -> StatusCode;
 
     // TODO: should these take order references for performance reasons?
     struct TradeExec {
-        OrderIdType ask_id_;
-        OrderIdType bid_id_;
+        OrderIdType ask_id;
+        OrderIdType bid_id;
     };
-    auto ExecuteTrade(TradeExec trade_exec, QuantityType exec_qty) -> void;
+    [[nodiscard]] auto ExecuteTrade(TradeExec trade_exec, QuantityType exec_qty) -> StatusCode;
 
-    [[nodiscard]] auto GetTopOrder(const Side &side) const -> Order;
+    [[nodiscard]] auto GetTopOrder(const Side &side) const -> std::expected<Order, StatusCode>;
     [[nodiscard]] auto GetOrderbookId() const -> OrderbookIdType {
         return orderbook_id_;
     }
@@ -64,10 +66,10 @@ class Orderbook {
         OrderListIterator iterator_;
     };
 
-    static auto ModifyOrderQuantity(QuantityType new_quantity, OrderLocation &old_order_location)
-        -> void;
+    [[nodiscard]] static auto ModifyOrderQuantity(QuantityType new_quantity,
+                                                  OrderLocation &old_order_location) -> StatusCode;
 
-    static auto ValidateOrder(const Order &order) -> void;
+    [[nodiscard]] static auto ValidateOrder(const Order &order) noexcept -> StatusCode;
 
     OrderbookIdType orderbook_id_;
 
@@ -78,10 +80,10 @@ class Orderbook {
 
 class OrderbookManager {
   public:
-    auto AddOrderbook(std::unique_ptr<Orderbook> orderbook) -> void;
+    [[nodiscard]] auto AddOrderbook(std::unique_ptr<Orderbook> orderbook) -> StatusCode;
 
-    [[nodiscard]] auto GetOrderbook(OrderbookIdType orderbook_id)
-        -> const std::unique_ptr<Orderbook> &;
+    [[nodiscard]] auto GetOrderbook(OrderbookIdType orderbook_id) const
+        -> std::expected<Orderbook *, StatusCode>;
 
   private:
     std::unordered_map<OrderbookIdType, std::unique_ptr<Orderbook>> orderbooks_;
