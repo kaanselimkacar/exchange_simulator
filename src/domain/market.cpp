@@ -172,6 +172,9 @@ auto Orderbook::GetTopOrder(const Side &side) const -> std::expected<Order, Stat
         }
         return side_map.begin()->second.GetTopOrder();
     };
+    if (side == Side::INVALID) [[unlikely]] {
+        std::unreachable();
+    }
     return side == Side::ASK ? get_top_order(asks_) : get_top_order(bids_);
 }
 

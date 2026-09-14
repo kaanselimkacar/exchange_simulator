@@ -661,10 +661,8 @@ TEST_F(DomainGatewayTest, ModifyOrderSideMismatchSilentlyRejected) {
 // Duplicate order id through the gateway
 // ============================================================================
 
-// SKIPPED: re-adding an already-consumed order id via DomainGateway currently
-// rests it on the book instead of rejecting it. Duplicate order detection at
-// the gateway boundary is expected to land with the rejection/reconciliation
-// design. Kept disabled until then.
+// SKIPPED: a fully-consumed order id is free for reuse in the domain. Whether
+// an exchange forbids id reuse is protocol-level policy, not domain behaviour.
 TEST_F(DomainGatewayTest, DISABLED_ReaddingOrderIdDoesNotDoubleExecute) {
     AddRestingAsk(*book_, 1, BASE_PRICE, BASE_QUANTITY);
     Order incoming{.order_id = INCOMING_ORDER_1,
