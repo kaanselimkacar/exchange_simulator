@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(MatchingEngine VERSION 1.0 LANGUAGES CXX)
+project(ExchangeSimulator VERSION 1.0 LANGUAGES CXX)
 
 # --- Standard & Strictness ---
 set(CMAKE_CXX_STANDARD 23)
